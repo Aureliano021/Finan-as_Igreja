@@ -130,8 +130,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             {filteredMembros.length > 0 ? (
               filteredMembros.map((m) => (
                 <div key={`m-mob-${m.id}`} style={{
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  border: '1px solid var(--border-color)',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
                   borderRadius: 'var(--radius-sm)',
                   padding: '12px 14px',
                   display: 'flex',
@@ -311,8 +312,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                 const memberName = typeof memberObj === 'object' ? (memberObj.nome || '') : String(memberObj || `ID ${d.membro_id}`);
                 return (
                   <div key={`diz-mob-${d.id}`} style={{
-                    background: 'rgba(15, 23, 42, 0.6)',
-                    border: '1px solid var(--border-color)',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
                     borderRadius: 'var(--radius-sm)',
                     padding: '10px 14px',
                     display: 'flex',
@@ -407,8 +409,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             {filteredOfertas.length > 0 ? (
               filteredOfertas.map((o) => (
                 <div key={`oferta-mob-${o.id}`} style={{
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  border: '1px solid var(--border-color)',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
                   borderRadius: 'var(--radius-sm)',
                   padding: '10px 14px',
                   display: 'flex',
@@ -494,8 +497,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             {filteredDespesas.length > 0 ? (
               filteredDespesas.map((d) => (
                 <div key={`desp-mob-${d.id}`} style={{
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  border: '1px solid var(--border-color)',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
                   borderRadius: 'var(--radius-sm)',
                   padding: '10px 14px',
                   display: 'flex',

@@ -82,8 +82,8 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
 
           {/* Toggle Mock Mode */}
           <div style={{
-            background: 'rgba(15, 23, 42, 0.6)',
-            border: '1px solid var(--border-color)',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
             padding: '12px 16px',
             borderRadius: 'var(--radius-sm)',
             display: 'flex',

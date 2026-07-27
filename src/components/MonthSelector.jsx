@@ -76,7 +76,7 @@ export default function MonthSelector({
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
         {/* Navigation Buttons */}
-        <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
           <button onClick={handlePrevMonth} className="btn btn-secondary btn-sm" style={{ border: 'none', borderRadius: 'var(--radius-sm) 0 0 var(--radius-sm)' }} title="Mês Anterior">
             <ChevronLeft size={16} />
           </button>
