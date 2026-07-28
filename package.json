@@ -12,8 +12,8 @@
   "dependencies": {
     "html2canvas": "^1.4.1",
     "lucide-react": "^1.27.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.3.0-canary-96fcba90-20260728",
+    "react-dom": "^19.3.0-canary-96fcba90-20260728",
     "recharts": "^3.10.1"
   },
   "devDependencies": {

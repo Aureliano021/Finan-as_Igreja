@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { Printer, Download, Settings, RefreshCw, Database, LayoutDashboard, DatabaseZap } from 'lucide-react';
 
 export default function NavbarDesktop({
@@ -26,6 +26,12 @@ export default function NavbarDesktop({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const handleTabChange = (tab) => {
+    startTransition(() => {
+      onChangeMainTab(tab);
+    });
+  };
+
   return (
     <header style={{
       position: 'sticky',
@@ -45,16 +51,16 @@ export default function NavbarDesktop({
         pointerEvents: 'auto',
         width: '100%',
         maxWidth: isScrolled ? '1180px' : 'calc(1320px - 32px)',
-        background: isScrolled ? 'rgba(15, 23, 42, 0.095)' : 'rgba(15, 23, 42, 0.04)',
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-        border: isScrolled ? '1px solid rgba(15, 23, 42, 0.15)' : '1px solid #e2e8f0',
-        borderTop: isScrolled ? '1px solid rgba(15, 23, 42, 0.15)' : '4px solid #c62828',
+        background: isScrolled ? 'rgba(15, 23, 42, 0.095)' : 'rgba(15, 23, 42, 0.05)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        border: isScrolled ? '1px solid rgba(15, 23, 42, 0.15)' : '1px solid rgba(15, 23, 42, 0.08)',
+        borderTop: isScrolled ? '1px solid rgba(255, 255, 255, 0.85)' : '4px solid #c62828',
         borderRadius: isScrolled ? '9999px' : '16px',
         padding: isScrolled ? '8px 22px' : '12px 24px',
         boxShadow: isScrolled
-          ? '0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03)'
-          : '0 4px 20px rgba(0, 0, 0, 0.04)',
+          ? '0 14px 36px -6px rgba(15, 23, 42, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.95)'
+          : '0 8px 30px -4px rgba(15, 23, 42, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -65,8 +71,24 @@ export default function NavbarDesktop({
         {/* Brand & Main Navigation Tabs */}
         <div style={{ display: 'flex', alignItems: 'center', gap: isScrolled ? '20px' : '32px', flexWrap: 'wrap', transition: 'gap 0.3s ease' }}>
 
-          {/* Brand Title */}
-          <div style={{ paddingLeft: '4px' }}>
+          {/* Brand Title with Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '4px' }}>
+            <div style={{
+              width: isScrolled ? '36px' : '42px',
+              height: isScrolled ? '36px' : '42px',
+              borderRadius: '12px',
+              background: '#ffffff',
+              border: '1px solid rgba(226, 232, 240, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.08)',
+              transition: 'all 0.3s ease'
+            }}>
+              <img src="/church-logo-color.jpg" alt="IMW Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+            <div>
             <span style={{
               fontSize: isScrolled ? '0.6rem' : '0.68rem',
               fontWeight: 800,
@@ -91,6 +113,7 @@ export default function NavbarDesktop({
               Gestão Financeira
             </h1>
           </div>
+        </div>
 
           {/* Segmented Navigation Tabs */}
           <div style={{
@@ -103,7 +126,7 @@ export default function NavbarDesktop({
             transition: 'all 0.3s ease'
           }}>
             <button
-              onClick={() => onChangeMainTab('dashboard')}
+              onClick={() => handleTabChange('dashboard')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -126,7 +149,7 @@ export default function NavbarDesktop({
             </button>
 
             <button
-              onClick={() => onChangeMainTab('explorer')}
+              onClick={() => handleTabChange('explorer')}
               style={{
                 display: 'flex',
                 alignItems: 'center',

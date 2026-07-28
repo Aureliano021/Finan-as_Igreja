@@ -1,31 +1,26 @@
 import React from 'react';
+import useMediaQuery from '../hooks/useMediaQuery';
 import TransactionsTableDesktop from './desktop/TransactionsTableDesktop';
 import TransactionsTableMobile from './mobile/TransactionsTableMobile';
 
 /**
  * Main TransactionsTable component.
- * Renders dedicated device components (TransactionsTableDesktop & TransactionsTableMobile)
- * to maintain clean separation of concerns and ensure zero cross-device styling conflicts.
+ * Conditionally renders only the device-appropriate component using
+ * useMediaQuery instead of rendering both and hiding with CSS.
+ * Exception: during PNG export, always render desktop layout.
  */
 export default function TransactionsTable(props) {
   const { isExporting } = props;
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   // When exporting PNG, always render the desktop side-by-side layout with full data
   if (isExporting) {
     return <TransactionsTableDesktop {...props} />;
   }
 
-  return (
-    <>
-      {/* Desktop view (rendered exclusively on desktop screens) */}
-      <div className="desktop-only">
-        <TransactionsTableDesktop {...props} />
-      </div>
-
-      {/* Mobile view (rendered exclusively on mobile smartphones) */}
-      <div className="mobile-only">
-        <TransactionsTableMobile {...props} />
-      </div>
-    </>
+  return isMobile ? (
+    <TransactionsTableMobile {...props} />
+  ) : (
+    <TransactionsTableDesktop {...props} />
   );
 }

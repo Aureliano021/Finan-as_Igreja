@@ -65,9 +65,36 @@ export default class ErrorBoundary extends React.Component {
             <h2 style={{ fontSize: '1.25rem', margin: '0 0 8px 0', color: '#f8fafc' }}>
               Ops! Ocorreu um imprevisto na exibição.
             </h2>
-            <p style={{ fontSize: '0.875rem', color: '#94a3b8', margin: '0 0 24px 0' }}>
+            <p style={{ fontSize: '0.875rem', color: '#94a3b8', margin: '0 0 16px 0' }}>
               Isso pode ocorrer por um dado inconsistente retornado do servidor ou falha pontual de renderização.
             </p>
+
+            {this.state.error && (
+              <details style={{
+                textAlign: 'left',
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid rgba(244, 63, 94, 0.2)',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                marginBottom: '20px',
+                fontSize: '0.78rem',
+                color: '#fca5a5',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#fb7185', marginBottom: '6px' }}>
+                  Detalhes Técnicos do Erro ({this.state.error.name || 'Error'})
+                </summary>
+                <div style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  <strong>{String(this.state.error.message || this.state.error)}</strong>
+                  {this.state.error.stack && (
+                    <div style={{ marginTop: '6px', color: '#94a3b8', fontSize: '0.72rem' }}>
+                      {this.state.error.stack}
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button 

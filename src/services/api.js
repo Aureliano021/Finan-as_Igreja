@@ -8,7 +8,7 @@ export function getApiUrl() {
     ? window.location.hostname 
     : 'localhost';
 
-  const saved = localStorage.getItem(API_URL_KEY);
+  const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem(API_URL_KEY) : null;
   
   if (saved) {
     // If on a remote device (e.g. smartphone on Wi-Fi at 192.168.x.x), replace localhost/127.0.0.1 with the actual host IP
@@ -24,15 +24,19 @@ export function getApiUrl() {
 }
 
 export function setApiUrl(url) {
-  localStorage.setItem(API_URL_KEY, url);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(API_URL_KEY, url);
+  }
 }
 
 export function isMockModeForced() {
-  return localStorage.getItem(MOCK_MODE_KEY) === 'true';
+  return (typeof localStorage !== 'undefined') ? localStorage.getItem(MOCK_MODE_KEY) === 'true' : false;
 }
 
 export function setMockModeForced(value) {
-  localStorage.setItem(MOCK_MODE_KEY, value ? 'true' : 'false');
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(MOCK_MODE_KEY, value ? 'true' : 'false');
+  }
 }
 
 /**

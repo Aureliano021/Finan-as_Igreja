@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, startTransition } from 'react';
+import ViewTransition from './SafeViewTransition';
+import useMediaQuery from '../hooks/useMediaQuery';
 import { Users, HeartHandshake, Gift, CreditCard, Search, Calendar, Check, X, Mail, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatCurrency, formatDateBR, maskCpf } from '../services/utils';
 
-const PAGE_SIZE = 15;
+const DEFAULT_PAGE_SIZE = 15;
 
 // Reusable pagination controls component extracted outside to prevent re-creation on render
-function PaginationControls({ list, page, setPage, pageSize = PAGE_SIZE }) {
+function PaginationControls({ list, page, setPage, pageSize = DEFAULT_PAGE_SIZE }) {
   const pages = Math.max(1, Math.ceil(list.length / pageSize));
   if (pages <= 1) return null;
   return (
@@ -38,6 +40,9 @@ function PaginationControls({ list, page, setPage, pageSize = PAGE_SIZE }) {
 }
 
 export default function DataExplorer({ membros = [], dizimos = [], ofertas = [], despesas = [] }) {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const pageSize = isMobile ? 8 : DEFAULT_PAGE_SIZE;
+
   const [subTab, setSubTab] = useState('membros'); // 'membros' | 'dizimos' | 'ofertas' | 'despesas'
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -99,9 +104,14 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
   }, [safeDespesas, search]);
 
   // Pagination helpers
-  const getPage = (list) => list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const getPage = (list) => list.slice((page - 1) * pageSize, page * pageSize);
 
-  const handleTabChange = (tab) => { setSubTab(tab); setPage(1); };
+  const handleTabChange = (tab) => {
+    startTransition(() => {
+      setSubTab(tab);
+      setPage(1);
+    });
+  };
   const handleSearchChange = (val) => { setSearchTerm(val); setPage(1); };
 
   return (
@@ -170,7 +180,8 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
       </div>
       {/* SUB-TAB 1: MEMBROS */}
       {subTab === 'membros' && (
-        <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
+        <ViewTransition enter="fade-in" exit="fade-out" default="none">
+          <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Users size={18} color="var(--accent-primary)" />
@@ -344,13 +355,15 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
-          <PaginationControls list={filteredMembros} page={page} setPage={setPage} />
+          <PaginationControls list={filteredMembros} page={page} setPage={setPage} pageSize={pageSize} />
         </div>
+      </ViewTransition>
       )}
 
       {/* SUB-TAB 2: DÍZIMOS */}
       {subTab === 'dizimos' && (
-        <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
+        <ViewTransition enter="fade-in" exit="fade-out" default="none">
+          <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <HeartHandshake size={18} color="var(--accent-dizimos)" />
@@ -445,13 +458,15 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
-          <PaginationControls list={filteredDizimos} page={page} setPage={setPage} />
+          <PaginationControls list={filteredDizimos} page={page} setPage={setPage} pageSize={pageSize} />
         </div>
+      </ViewTransition>
       )}
 
       {/* SUB-TAB 3: OFERTAS */}
       {subTab === 'ofertas' && (
-        <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
+        <ViewTransition enter="fade-in" exit="fade-out" default="none">
+          <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Gift size={18} color="var(--accent-ofertas)" />
@@ -534,13 +549,15 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
-          <PaginationControls list={filteredOfertas} page={page} setPage={setPage} />
+          <PaginationControls list={filteredOfertas} page={page} setPage={setPage} pageSize={pageSize} />
         </div>
+      </ViewTransition>
       )}
 
       {/* SUB-TAB 4: DESPESAS */}
       {subTab === 'despesas' && (
-        <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
+        <ViewTransition enter="fade-in" exit="fade-out" default="none">
+          <div className="glass-card" style={{ padding: '20px', minHeight: '480px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CreditCard size={18} color="var(--accent-expense)" />
@@ -627,8 +644,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
-          <PaginationControls list={filteredDespesas} page={page} setPage={setPage} />
+          <PaginationControls list={filteredDespesas} page={page} setPage={setPage} pageSize={pageSize} />
         </div>
+      </ViewTransition>
       )}
 
     </div>

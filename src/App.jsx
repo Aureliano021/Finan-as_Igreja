@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 
 import Navbar from './components/Navbar';
 import PeriodSelector from './components/PeriodSelector';
 import KpiCards from './components/KpiCards';
-import FinancialCharts from './components/FinancialCharts';
+const FinancialCharts = React.lazy(() => import('./components/FinancialCharts'));
 import TransactionsTable from './components/TransactionsTable';
 import DataExplorer from './components/DataExplorer';
 import ApiConfigModal from './components/ApiConfigModal';
@@ -32,10 +32,10 @@ function filterByPeriod(items, viewMode, year, month) {
 
 export default function App() {
   const currentDate = new Date();
-  
+
   // Main Top Tab ('dashboard' | 'explorer')
   const [mainTab, setMainTab] = useState('dashboard');
-  
+
   // Period View Mode ('month' | 'year') - Default to 'month' as requested
   const [viewMode, setViewMode] = useState('month');
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
@@ -43,7 +43,7 @@ export default function App() {
 
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ status: 'mock', message: 'Carregando…' });
-  
+
   const [membros, setMembros] = useState([]);
   const [dizimos, setDizimos] = useState([]);
   const [ofertas, setOfertas] = useState([]);
@@ -166,9 +166,32 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* 🌊 Ambient Glass Background Orbs & Church Logo Watermark */}
+      <div className="ambient-bg-orbs no-print" aria-hidden="true">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 'clamp(280px, 60vw, 480px)',
+          height: 'clamp(280px, 60vw, 480px)',
+          pointerEvents: 'none',
+          opacity: 0.05,
+          zIndex: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <img src="/church-logo-bw.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </div>
+      </div>
+
       {/* Top Navigation */}
-      <Navbar 
+      <Navbar
         mainTab={mainTab}
         onChangeMainTab={setMainTab}
         connectionStatus={connectionStatus}
@@ -181,7 +204,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main style={{ flex: 1, maxWidth: '1320px', width: '100%', margin: '0 auto', padding: '24px 16px' }} ref={dashboardRef}>
-        
+
         {loading ? (
           <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }} role="status" aria-live="polite">
             <div className="animate-spin" aria-hidden="true" style={{
@@ -200,7 +223,7 @@ export default function App() {
             {mainTab === 'dashboard' && (
               <>
                 {/* Period Selector (Visão Geral / Por Ano / Por Mês) */}
-                <PeriodSelector 
+                <PeriodSelector
                   viewMode={viewMode}
                   onChangeViewMode={setViewMode}
                   selectedYear={selectedYear}
@@ -211,7 +234,7 @@ export default function App() {
                 />
 
                 {/* KPI Summary Cards */}
-                <KpiCards 
+                <KpiCards
                   totalDizimos={totalDizimos}
                   countDizimos={dizimosFiltered.length}
                   totalOfertas={totalOfertas}
@@ -220,18 +243,24 @@ export default function App() {
                   countDespesas={despesasFiltered.length}
                 />
 
-                {/* Financial Visual Charts */}
-                <FinancialCharts 
-                  dizimosMonth={dizimosFiltered}
-                  ofertasMonth={ofertasFiltered}
-                  despesasMonth={despesasFiltered}
-                  totalDizimos={totalDizimos}
-                  totalOfertas={totalOfertas}
-                  totalDespesas={totalDespesas}
-                />
+                {/* Financial Visual Charts (lazy-loaded for bundle optimization) */}
+                <Suspense fallback={
+                  <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '28px' }}>
+                    Carregando gráficos…
+                  </div>
+                }>
+                  <FinancialCharts
+                    dizimosMonth={dizimosFiltered}
+                    ofertasMonth={ofertasFiltered}
+                    despesasMonth={despesasFiltered}
+                    totalDizimos={totalDizimos}
+                    totalOfertas={totalOfertas}
+                    totalDespesas={totalDespesas}
+                  />
+                </Suspense>
 
                 {/* Detailed Data Tables */}
-                <TransactionsTable 
+                <TransactionsTable
                   dizimosMonth={dizimosFiltered}
                   ofertasMonth={ofertasFiltered}
                   despesasMonth={despesasFiltered}
@@ -244,7 +273,7 @@ export default function App() {
 
             {/* MAIN TAB 2: CENTRAL DE CADASTROS & LISTAGEM DEDICADA */}
             {mainTab === 'explorer' && (
-              <DataExplorer 
+              <DataExplorer
                 membros={membros}
                 dizimos={dizimos}
                 ofertas={ofertas}
@@ -267,14 +296,14 @@ export default function App() {
       </footer>
 
       {/* Api Configuration Modal */}
-      <ApiConfigModal 
+      <ApiConfigModal
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
         onSaved={loadData}
       />
 
       {/* Printable PDF A4 Report Component */}
-      <PrintableReport 
+      <PrintableReport
         selectedYear={selectedYear}
         selectedMonth={selectedMonth}
         dizimosMonth={dizimosFiltered}

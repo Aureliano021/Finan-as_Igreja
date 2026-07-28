@@ -17,16 +17,15 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
       {/* 1. Total Entradas */}
       <div className="glass-card kpi-card" style={{
         padding: '16px',
-        borderLeft: '4px solid #c62828',
-        background: '#ebf2fc'
+        borderLeft: '4px solid #1565c0'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <span className="kpi-card-title" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
             Total Entradas
           </span>
           <div className="kpi-card-icon" style={{
-            background: '#dbe6f6',
-            color: '#0f172a',
+            background: 'rgba(21, 101, 192, 0.12)',
+            color: '#1565c0',
             padding: '7px',
             borderRadius: '10px'
           }}>
@@ -44,16 +43,15 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
       {/* 2. Dízimos */}
       <div className="glass-card kpi-card" style={{
         padding: '16px',
-        borderLeft: '4px solid #c62828',
-        background: '#ebf2fc'
+        borderLeft: '4px solid #059669'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <span className="kpi-card-title" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
             Total Dízimos
           </span>
           <div className="kpi-card-icon" style={{
-            background: '#dbe6f6',
-            color: '#0f172a',
+            background: 'rgba(5, 150, 105, 0.12)',
+            color: '#059669',
             padding: '7px',
             borderRadius: '10px'
           }}>
@@ -71,16 +69,15 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
       {/* 3. Ofertas */}
       <div className="glass-card kpi-card" style={{
         padding: '16px',
-        borderLeft: '4px solid #c62828',
-        background: '#ebf2fc'
+        borderLeft: '4px solid #4f46e5'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <span className="kpi-card-title" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
             Total Ofertas
           </span>
           <div className="kpi-card-icon" style={{
-            background: '#dbe6f6',
-            color: '#334155',
+            background: 'rgba(79, 70, 229, 0.12)',
+            color: '#4f46e5',
             padding: '7px',
             borderRadius: '10px'
           }}>
@@ -98,16 +95,15 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
       {/* 4. Despesas */}
       <div className="glass-card kpi-card" style={{
         padding: '16px',
-        borderLeft: '4px solid #c62828',
-        background: '#ebf2fc'
+        borderLeft: '4px solid #e11d48'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <span className="kpi-card-title" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
             Total Despesas
           </span>
           <div className="kpi-card-icon" style={{
-            background: '#dbe6f6',
-            color: '#475569',
+            background: 'rgba(225, 29, 72, 0.12)',
+            color: '#e11d48',
             padding: '7px',
             borderRadius: '10px'
           }}>
@@ -125,16 +121,15 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
       {/* 5. Saldo Líquido */}
       <div className="glass-card kpi-card kpi-card-saldo" style={{
         padding: '16px',
-        borderLeft: '4px solid #c62828',
-        background: '#ebf2fc'
+        borderLeft: `4px solid ${isPositivo ? '#059669' : '#e11d48'}`
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <span className="kpi-card-title" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
             Saldo Líquido
           </span>
           <div className="kpi-card-icon" style={{
-            background: '#0f172a',
-            color: '#ffffff',
+            background: isPositivo ? 'rgba(5, 150, 105, 0.15)' : 'rgba(225, 29, 72, 0.15)',
+            color: isPositivo ? '#059669' : '#e11d48',
             padding: '7px',
             borderRadius: '10px'
           }}>
@@ -144,7 +139,7 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
         <div className="kpi-card-value" style={{
           fontSize: 'clamp(1.15rem, 3.5vw, 1.5rem)',
           fontWeight: 800,
-          color: '#0f172a',
+          color: isPositivo ? '#059669' : '#e11d48',
           letterSpacing: '-0.02em',
           display: 'flex',
           alignItems: 'center',
@@ -157,7 +152,7 @@ export default function KpiCards({ totalDizimos, countDizimos, totalOfertas, cou
           {formatCurrency(saldoLiquido)}
         </div>
         <span className="kpi-card-subtext" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginTop: '4px', display: 'block' }}>
-          {isPositivo ? 'Superávit Financieiro' : 'Déficit no Período'}
+          {isPositivo ? 'Superávit Financeiro' : 'Déficit no Período'}
         </span>
       </div>
     </div>

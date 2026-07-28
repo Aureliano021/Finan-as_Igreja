@@ -40,7 +40,7 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px'
-    }} className="no-print animate-fade-in">
+    }} className="no-print">
       <div className="glass-card" style={{
         width: '100%',
         maxWidth: '480px',
