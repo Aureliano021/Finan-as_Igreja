@@ -68,10 +68,14 @@ export async function checkApiHealth() {
 
 /**
  * Helper to fetch single endpoint safely catching CORS and network errors
+ * Uses a 5-second timeout to avoid blocking the Promise.all indefinitely
  */
 async function safeFetchJson(url) {
   try {
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 seconds timeout
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const json = await res.json();
       return Array.isArray(json) ? json : null;

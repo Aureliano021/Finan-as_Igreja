@@ -1,10 +1,46 @@
 import React, { useState } from 'react';
-import { Users, HeartHandshake, Gift, CreditCard, Search, Calendar, Check, X, Mail, Phone } from 'lucide-react';
-import { formatCurrency, formatDateBR } from '../services/utils';
+import { Users, HeartHandshake, Gift, CreditCard, Search, Calendar, Check, X, Mail, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatCurrency, formatDateBR, maskCpf } from '../services/utils';
+
+const PAGE_SIZE = 15;
+
+// Reusable pagination controls component extracted outside to prevent re-creation on render
+function PaginationControls({ list, page, setPage, pageSize = PAGE_SIZE }) {
+  const pages = Math.max(1, Math.ceil(list.length / pageSize));
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        Página {page} de {pages} &bull; {list.length} registro(s)
+      </span>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          className="btn btn-secondary"
+          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+          disabled={page === 1}
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          aria-label="Página anterior"
+        >
+          <ChevronLeft size={14} /> Anterior
+        </button>
+        <button
+          className="btn btn-secondary"
+          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+          disabled={page >= pages}
+          onClick={() => setPage(p => Math.min(pages, p + 1))}
+          aria-label="Próxima página"
+        >
+          Próxima <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function DataExplorer({ membros = [], dizimos = [], ofertas = [], despesas = [] }) {
   const [subTab, setSubTab] = useState('membros'); // 'membros' | 'dizimos' | 'ofertas' | 'despesas'
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
 
   const safeMembros = Array.isArray(membros) ? membros : [];
   const safeDizimos = Array.isArray(dizimos) ? dizimos : [];
@@ -20,39 +56,53 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
       if (m && m.id != null) map[m.id] = m;
     });
     return map;
-  }, [membros]);
+  }, [safeMembros]);
 
-  // Filtered Sub-datasets
-  const filteredMembros = safeMembros.filter(m => {
-    if (!m) return false;
-    const nome = (m.nome || '').toLowerCase();
-    const cpf = (m.cpf || '').toLowerCase();
-    const email = (m.email || '').toLowerCase();
-    const celular = (m.celular || '').toLowerCase();
-    return nome.includes(search) || cpf.includes(search) || email.includes(search) || celular.includes(search);
-  });
+  // Filtered Sub-datasets (Memoized for performance)
+  const filteredMembros = React.useMemo(() => {
+    return safeMembros.filter(m => {
+      if (!m) return false;
+      const nome = (m.nome || '').toLowerCase();
+      const cpf = (m.cpf || '').toLowerCase();
+      const email = (m.email || '').toLowerCase();
+      const celular = (m.celular || '').toLowerCase();
+      return nome.includes(search) || cpf.includes(search) || email.includes(search) || celular.includes(search);
+    });
+  }, [safeMembros, search]);
 
-  const filteredDizimos = safeDizimos.filter(d => {
-    if (!d) return false;
-    const memberObj = membrosMap[d.membro_id];
-    const memberName = typeof memberObj === 'object' ? (memberObj.nome || '') : String(memberObj || `ID: ${d.membro_id}`);
-    const dateFormatted = formatDateBR(d.data);
-    return memberName.toLowerCase().includes(search) || dateFormatted.includes(search) || String(d.id).includes(search);
-  });
+  const filteredDizimos = React.useMemo(() => {
+    return safeDizimos.filter(d => {
+      if (!d) return false;
+      const memberObj = membrosMap[d.membro_id];
+      const memberName = typeof memberObj === 'object' ? (memberObj.nome || '') : String(memberObj || `ID: ${d.membro_id}`);
+      const dateFormatted = formatDateBR(d.data);
+      return memberName.toLowerCase().includes(search) || dateFormatted.includes(search) || String(d.id).includes(search);
+    });
+  }, [safeDizimos, membrosMap, search]);
 
-  const filteredOfertas = safeOfertas.filter(o => {
-    if (!o) return false;
-    const dateFormatted = formatDateBR(o.data);
-    const valStr = o.valor != null ? String(o.valor) : '';
-    return dateFormatted.includes(search) || valStr.includes(search) || String(o.id).includes(search);
-  });
+  const filteredOfertas = React.useMemo(() => {
+    return safeOfertas.filter(o => {
+      if (!o) return false;
+      const dateFormatted = formatDateBR(o.data);
+      const valStr = o.valor != null ? String(o.valor) : '';
+      return dateFormatted.includes(search) || valStr.includes(search) || String(o.id).includes(search);
+    });
+  }, [safeOfertas, search]);
 
-  const filteredDespesas = safeDespesas.filter(d => {
-    if (!d) return false;
-    const nome = (d.nome || '').toLowerCase();
-    const dateFormatted = formatDateBR(d.data);
-    return nome.includes(search) || dateFormatted.includes(search) || String(d.id).includes(search);
-  });
+  const filteredDespesas = React.useMemo(() => {
+    return safeDespesas.filter(d => {
+      if (!d) return false;
+      const nome = (d.nome || '').toLowerCase();
+      const dateFormatted = formatDateBR(d.data);
+      return nome.includes(search) || dateFormatted.includes(search) || String(d.id).includes(search);
+    });
+  }, [safeDespesas, search]);
+
+  // Pagination helpers
+  const getPage = (list) => list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleTabChange = (tab) => { setSubTab(tab); setPage(1); };
+  const handleSearchChange = (val) => { setSearchTerm(val); setPage(1); };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -70,7 +120,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
           <div className="tab-list" style={{ flex: '1 1 300px', minWidth: 0 }}>
             <button
               className={`tab-button ${subTab === 'membros' ? 'active' : ''}`}
-              onClick={() => setSubTab('membros')}
+              onClick={() => handleTabChange('membros')}
             >
               <Users size={16} color="currentColor" />
               Membros ({safeMembros.length})
@@ -78,7 +128,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
 
             <button
               className={`tab-button ${subTab === 'dizimos' ? 'active' : ''}`}
-              onClick={() => setSubTab('dizimos')}
+              onClick={() => handleTabChange('dizimos')}
             >
               <HeartHandshake size={16} color="currentColor" />
               Dízimos ({safeDizimos.length})
@@ -86,7 +136,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
 
             <button
               className={`tab-button ${subTab === 'ofertas' ? 'active' : ''}`}
-              onClick={() => setSubTab('ofertas')}
+              onClick={() => handleTabChange('ofertas')}
             >
               <Gift size={16} color="currentColor" />
               Ofertas ({safeOfertas.length})
@@ -94,7 +144,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
 
             <button
               className={`tab-button ${subTab === 'despesas' ? 'active' : ''}`}
-              onClick={() => setSubTab('despesas')}
+              onClick={() => handleTabChange('despesas')}
             >
               <CreditCard size={16} color="currentColor" />
               Despesas ({safeDespesas.length})
@@ -103,14 +153,17 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
 
           {/* Search Field */}
           <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 0 }}>
-            <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={15} color="var(--text-muted)" aria-hidden="true" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
+              name="search"
+              aria-label="Buscar registros"
+              autoComplete="off"
               className="text-input"
               style={{ width: '100%', paddingLeft: '36px' }}
-              placeholder="Buscar registros..."
+              placeholder="Buscar registros…"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
         </div>
@@ -128,7 +181,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
           {/* MOBILE SIMPLIFIED VIEW */}
           <div className="mobile-data-view">
             {filteredMembros.length > 0 ? (
-              filteredMembros.map((m) => (
+              getPage(filteredMembros).map((m) => (
                 <div key={`m-mob-${m.id}`} style={{
                   background: '#ffffff',
                   border: '1px solid #e2e8f0',
@@ -194,7 +247,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                   {(m.celular || m.email || m.cpf) && (
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {m.celular && <span><Phone size={10} /> {m.celular}</span>}
-                      {m.cpf && <span>CPF: {m.cpf}</span>}
+                      {m.cpf && <span>CPF: {maskCpf(m.cpf)}</span>}
                     </div>
                   )}
                 </div>
@@ -211,17 +264,17 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Nome Completo</th>
-                  <th>CPF</th>
-                  <th>Contato (Email / Celular)</th>
-                  <th>Endereço / CEP</th>
-                  <th>Situação do Membro</th>
+                  <th scope="col">ID</th>
+                  <th scope="col">Nome Completo</th>
+                  <th scope="col">CPF</th>
+                  <th scope="col">Contato (Email / Celular)</th>
+                  <th scope="col">Endereço / CEP</th>
+                  <th scope="col">Situação do Membro</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredMembros.length > 0 ? (
-                  filteredMembros.map((m) => (
+                  getPage(filteredMembros).map((m) => (
                     <tr key={`membro-${m.id}`}>
                       <td style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         #{m.id}
@@ -235,7 +288,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                         )}
                       </td>
                       <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {m.cpf || '-'}
+                        {maskCpf(m.cpf)}
                       </td>
                       <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         {m.email && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={12} /> {m.email}</div>}
@@ -291,6 +344,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
+          <PaginationControls list={filteredMembros} page={page} setPage={setPage} />
         </div>
       )}
 
@@ -307,7 +361,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
           {/* MOBILE SIMPLIFIED VIEW */}
           <div className="mobile-data-view">
             {filteredDizimos.length > 0 ? (
-              filteredDizimos.map((d) => {
+              getPage(filteredDizimos).map((d) => {
                 const memberObj = membrosMap[d.membro_id];
                 const memberName = typeof memberObj === 'object' ? (memberObj.nome || '') : String(memberObj || `ID ${d.membro_id}`);
                 return (
@@ -358,7 +412,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </thead>
               <tbody>
                 {filteredDizimos.length > 0 ? (
-                  filteredDizimos.map((d) => {
+                  getPage(filteredDizimos).map((d) => {
                     const memberObj = membrosMap[d.membro_id];
                     const memberName = typeof memberObj === 'object' ? (memberObj.nome || '') : String(memberObj || `ID ${d.membro_id}`);
                     return (
@@ -391,6 +445,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
+          <PaginationControls list={filteredDizimos} page={page} setPage={setPage} />
         </div>
       )}
 
@@ -407,7 +462,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
           {/* MOBILE SIMPLIFIED VIEW */}
           <div className="mobile-data-view">
             {filteredOfertas.length > 0 ? (
-              filteredOfertas.map((o) => (
+              getPage(filteredOfertas).map((o) => (
                 <div key={`oferta-mob-${o.id}`} style={{
                   background: '#ffffff',
                   border: '1px solid #e2e8f0',
@@ -453,7 +508,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </thead>
               <tbody>
                 {filteredOfertas.length > 0 ? (
-                  filteredOfertas.map((o) => (
+                  getPage(filteredOfertas).map((o) => (
                     <tr key={`oferta-all-${o.id}`}>
                       <td style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         #{o.id}
@@ -479,6 +534,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
+          <PaginationControls list={filteredOfertas} page={page} setPage={setPage} />
         </div>
       )}
 
@@ -495,7 +551,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
           {/* MOBILE SIMPLIFIED VIEW */}
           <div className="mobile-data-view">
             {filteredDespesas.length > 0 ? (
-              filteredDespesas.map((d) => (
+              getPage(filteredDespesas).map((d) => (
                 <div key={`desp-mob-${d.id}`} style={{
                   background: '#ffffff',
                   border: '1px solid #e2e8f0',
@@ -542,7 +598,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </thead>
               <tbody>
                 {filteredDespesas.length > 0 ? (
-                  filteredDespesas.map((d) => (
+                  getPage(filteredDespesas).map((d) => (
                     <tr key={`despesa-all-${d.id}`}>
                       <td style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         #{d.id}
@@ -571,6 +627,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
               </tbody>
             </table>
           </div>
+          <PaginationControls list={filteredDespesas} page={page} setPage={setPage} />
         </div>
       )}
 

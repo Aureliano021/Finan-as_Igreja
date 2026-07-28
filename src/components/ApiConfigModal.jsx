@@ -56,8 +56,8 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
               Configuração da API Backend
             </h3>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-            <X size={20} />
+          <button onClick={onClose} aria-label="Fechar modal" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
@@ -68,12 +68,15 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
               URL da API Python (FastAPI):
             </label>
             <input 
-              type="text" 
+              type="url" 
+              name="apiUrl"
+              autoComplete="off"
+              spellCheck={false}
               className="text-input" 
               style={{ width: '100%' }}
               value={url}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="http://localhost:8000"
+              placeholder="http://localhost:8000…"
             />
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
               Certifique-se de habilitar o CORSMiddleware em seu <code>controller.py</code>.
@@ -100,9 +103,12 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
             </div>
             <button 
               onClick={() => setUseMockState(!useMock)}
+              role="switch"
+              aria-checked={useMock}
+              aria-label="Forçar Modo Mock"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: useMock ? '#fbbf24' : 'var(--text-muted)' }}
             >
-              {useMock ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+              {useMock ? <ToggleRight size={32} aria-hidden="true" /> : <ToggleLeft size={32} aria-hidden="true" />}
             </button>
           </div>
 

@@ -3,69 +3,75 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieC
 import { formatCurrency, categorizeExpense } from '../services/utils';
 import { BarChart3, PieChart as PieIcon } from 'lucide-react';
 
-const PIE_COLORS = ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1'];
+// Semantically distinct color palette for expense categories
+const PIE_COLORS = ['#1565c0', '#c62828', '#2e7d32', '#e65100', '#6a1b9a', '#00695c', '#f9a825', '#0277bd'];
 
-export default function FinancialCharts({ dizimosMonth = [], ofertasMonth = [], despesasMonth = [] }) {
+// Custom Tooltip component extracted outside to avoid re-creation on render
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #0f172a',
+        padding: '10px 14px',
+        borderRadius: '8px',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+        fontSize: '0.85rem'
+      }}>
+        <p style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>{label || payload[0].name}</p>
+        {payload.map((entry, index) => (
+          <p key={`item-${index}`} style={{ margin: '4px 0 0 0', fontWeight: 600, color: '#0f172a' }}>
+            {entry.name}: {formatCurrency(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+export default function FinancialCharts({ dizimosMonth = [], ofertasMonth = [], despesasMonth = [], totalDizimos = 0, totalOfertas = 0, totalDespesas = 0 }) {
   const safeDizimos = Array.isArray(dizimosMonth) ? dizimosMonth : [];
   const safeOfertas = Array.isArray(ofertasMonth) ? ofertasMonth : [];
   const safeDespesas = Array.isArray(despesasMonth) ? despesasMonth : [];
 
-  const totalDizimos = safeDizimos.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0);
-  const totalOfertas = safeOfertas.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0);
-  const totalDespesas = safeDespesas.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0);
+  // Use pre-computed totals from App.jsx — no duplicate reduction
   const totalEntradas = totalDizimos + totalOfertas;
 
-  // Categorized expenses map
-  const expenseCategoriesMap = {};
-  safeDespesas.forEach(item => {
-    if (!item) return;
-    const category = categorizeExpense(item.nome);
-    const val = Number(item.valor) || 0;
-    expenseCategoriesMap[category] = (expenseCategoriesMap[category] || 0) + val;
-  });
+  // Categorized expenses list (Memoized for performance)
+  const expenseCategoriesList = React.useMemo(() => {
+    const expenseCategoriesMap = {};
+    safeDespesas.forEach(item => {
+      if (!item) return;
+      const category = categorizeExpense(item.nome);
+      const val = Number(item.valor) || 0;
+      expenseCategoriesMap[category] = (expenseCategoriesMap[category] || 0) + val;
+    });
 
-  const expenseCategoriesList = Object.keys(expenseCategoriesMap).map(cat => ({
-    name: cat,
-    value: expenseCategoriesMap[cat],
-    percent: totalDespesas > 0 ? (expenseCategoriesMap[cat] / totalDespesas) * 100 : 0
-  })).sort((a, b) => b.value - a.value);
+    return Object.keys(expenseCategoriesMap).map(cat => ({
+      name: cat,
+      value: expenseCategoriesMap[cat],
+      percent: totalDespesas > 0 ? (expenseCategoriesMap[cat] / totalDespesas) * 100 : 0
+    })).sort((a, b) => b.value - a.value);
+  }, [safeDespesas, totalDespesas]);
 
-  // Data for Recharts Bar Chart - Monochrome Solid Colors
-  const comparisonData = [
-    { name: 'Dízimos', valor: totalDizimos, fill: '#0f172a' },
-    { name: 'Ofertas', valor: totalOfertas, fill: '#334155' },
-    { name: 'Total Entradas', valor: totalEntradas, fill: '#1e293b' },
-    { name: 'Total Saídas', valor: totalDespesas, fill: '#64748b' }
-  ];
+  // Data for Recharts Bar Chart - Semantically colored bars (Memoized)
+  const comparisonData = React.useMemo(() => [
+    { name: 'Dízimos', valor: totalDizimos, fill: '#1565c0' },
+    { name: 'Ofertas', valor: totalOfertas, fill: '#2e7d32' },
+    { name: 'Total Entradas', valor: totalEntradas, fill: '#0277bd' },
+    { name: 'Total Saídas', valor: totalDespesas, fill: '#c62828' }
+  ], [totalDizimos, totalOfertas, totalEntradas, totalDespesas]);
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #0f172a',
-          padding: '10px 14px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
-          fontSize: '0.85rem'
-        }}>
-          <p style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>{label || payload[0].name}</p>
-          {payload.map((entry, index) => (
-            <p key={`item-${index}`} style={{ margin: '4px 0 0 0', fontWeight: 600, color: '#0f172a' }}>
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Percentages for mobile proportion bar
-  const totalMovimentado = totalEntradas + totalDespesas;
-  const pctDizimos = totalMovimentado > 0 ? Math.round((totalDizimos / totalMovimentado) * 100) : 0;
-  const pctOfertas = totalMovimentado > 0 ? Math.round((totalOfertas / totalMovimentado) * 100) : 0;
-  const pctDespesas = totalMovimentado > 0 ? Math.round((totalDespesas / totalMovimentado) * 100) : 0;
+  // Percentages for mobile proportion bar (Memoized)
+  const { pctDizimos, pctOfertas, pctDespesas } = React.useMemo(() => {
+    const totalMovimentado = totalEntradas + totalDespesas;
+    return {
+      pctDizimos: totalMovimentado > 0 ? Math.round((totalDizimos / totalMovimentado) * 100) : 0,
+      pctOfertas: totalMovimentado > 0 ? Math.round((totalOfertas / totalMovimentado) * 100) : 0,
+      pctDespesas: totalMovimentado > 0 ? Math.round((totalDespesas / totalMovimentado) * 100) : 0
+    };
+  }, [totalEntradas, totalDespesas, totalDizimos, totalOfertas]);
 
   return (
     <div className="no-print" style={{ marginBottom: '28px' }}>
@@ -180,7 +186,7 @@ export default function FinancialCharts({ dizimosMonth = [], ofertasMonth = [], 
               Comparativo de Balanço
             </h3>
           </div>
-          <div style={{ width: '100%', height: 240 }}>
+          <div style={{ width: '100%', height: 240 }} role="img" aria-label="Gráfico comparativo de balanço financeiro entre dízimos, ofertas e despesas">
             <ResponsiveContainer>
               <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
@@ -212,7 +218,7 @@ export default function FinancialCharts({ dizimosMonth = [], ofertasMonth = [], 
           {expenseCategoriesList.length > 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', height: 240 }}>
               {/* Donut Graphic */}
-              <div style={{ width: '180px', height: '100%', flexShrink: 0 }}>
+              <div style={{ width: '180px', height: '100%', flexShrink: 0 }} role="img" aria-label="Gráfico de rosca da distribuição de despesas por categoria">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                     <Pie

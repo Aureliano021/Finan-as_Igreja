@@ -3,6 +3,17 @@
  */
 
 /**
+ * Mask CPF to protect privacy (LGPD) — shows only middle digits
+ * Input: "12345678901" → Output: "***.456.789-**"
+ */
+export function maskCpf(cpf) {
+  if (!cpf) return '-';
+  const clean = String(cpf).replace(/\D/g, '');
+  if (clean.length !== 11) return cpf; // return as-is if not a valid CPF
+  return `***.${clean.slice(3, 6)}.${clean.slice(6, 9)}-**`;
+}
+
+/**
  * Format a numeric value to Brazilian Real currency (R$ 1.250,00)
  */
 export function formatCurrency(value) {

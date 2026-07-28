@@ -156,6 +156,7 @@ export default function NavbarDesktop({
           {/* API Connection Badge */}
           <button
             onClick={onOpenConfig}
+            aria-live="polite"
             style={{
               background: 'transparent',
               border: 'none',

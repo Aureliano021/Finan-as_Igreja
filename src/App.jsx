@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 
 import Navbar from './components/Navbar';
 import PeriodSelector from './components/PeriodSelector';
@@ -13,6 +12,24 @@ import PrintableReport from './components/PrintableReport';
 import { fetchAllFinancialData } from './services/api';
 import { isSameMonthAndYear } from './services/utils';
 
+/**
+ * Generic period filter — avoids duplicating the same logic for each entity.
+ * viewMode: 'all' | 'year' | 'month'
+ */
+function filterByPeriod(items, viewMode, year, month) {
+  if (!Array.isArray(items)) return [];
+  if (viewMode === 'all') return items;
+  return items.filter(item => {
+    if (!item?.data) return false;
+    const parts = String(item.data).trim().split('T')[0].split('-');
+    if (parts.length < 2) return false;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (viewMode === 'year') return y === year;
+    return y === year && m === month && isSameMonthAndYear(item.data, year, month);
+  });
+}
+
 export default function App() {
   const currentDate = new Date();
   
@@ -25,7 +42,7 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
 
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState({ status: 'mock', message: 'Carregando...' });
+  const [connectionStatus, setConnectionStatus] = useState({ status: 'mock', message: 'Carregando…' });
   
   const [membros, setMembros] = useState([]);
   const [dizimos, setDizimos] = useState([]);
@@ -81,7 +98,7 @@ export default function App() {
   // Auto-set selected year to most recent year with data if available
   useEffect(() => {
     if (!loading && availableYearsAndMonths.sortedYears.length > 0) {
-      setSelectedYear(availableYearsAndMonths.sortedYears[0]);
+      setSelectedYear(prev => availableYearsAndMonths.sortedYears.includes(prev) ? prev : availableYearsAndMonths.sortedYears[0]);
     }
   }, [loading, availableYearsAndMonths]);
 
@@ -98,56 +115,34 @@ export default function App() {
     return map;
   }, [membros]);
 
-  // Filter datasets based on viewMode ('all' | 'year' | 'month')
-  const dizimosFiltered = React.useMemo(() => {
-    if (!Array.isArray(dizimos)) return [];
-    if (viewMode === 'all') return dizimos;
-    return dizimos.filter(item => {
-      if (!item || !item.data) return false;
-      const str = String(item.data).trim().split('T')[0];
-      const parts = str.split('-');
-      const y = parseInt(parts[0], 10);
-      if (viewMode === 'year') return y === selectedYear;
-      return isSameMonthAndYear(item.data, selectedYear, selectedMonth);
-    });
-  }, [dizimos, viewMode, selectedYear, selectedMonth]);
+  // Filter datasets based on viewMode using shared filterByPeriod helper
+  const dizimosFiltered = React.useMemo(
+    () => filterByPeriod(dizimos, viewMode, selectedYear, selectedMonth),
+    [dizimos, viewMode, selectedYear, selectedMonth]
+  );
 
-  const ofertasFiltered = React.useMemo(() => {
-    if (!Array.isArray(ofertas)) return [];
-    if (viewMode === 'all') return ofertas;
-    return ofertas.filter(item => {
-      if (!item || !item.data) return false;
-      const str = String(item.data).trim().split('T')[0];
-      const parts = str.split('-');
-      const y = parseInt(parts[0], 10);
-      if (viewMode === 'year') return y === selectedYear;
-      return isSameMonthAndYear(item.data, selectedYear, selectedMonth);
-    });
-  }, [ofertas, viewMode, selectedYear, selectedMonth]);
+  const ofertasFiltered = React.useMemo(
+    () => filterByPeriod(ofertas, viewMode, selectedYear, selectedMonth),
+    [ofertas, viewMode, selectedYear, selectedMonth]
+  );
 
-  const despesasFiltered = React.useMemo(() => {
-    if (!Array.isArray(despesas)) return [];
-    if (viewMode === 'all') return despesas;
-    return despesas.filter(item => {
-      if (!item || !item.data) return false;
-      const str = String(item.data).trim().split('T')[0];
-      const parts = str.split('-');
-      const y = parseInt(parts[0], 10);
-      if (viewMode === 'year') return y === selectedYear;
-      return isSameMonthAndYear(item.data, selectedYear, selectedMonth);
-    });
-  }, [despesas, viewMode, selectedYear, selectedMonth]);
+  const despesasFiltered = React.useMemo(
+    () => filterByPeriod(despesas, viewMode, selectedYear, selectedMonth),
+    [despesas, viewMode, selectedYear, selectedMonth]
+  );
 
-  // Calculate totals for KPI cards
-  const totalDizimos = dizimosFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0);
-  const totalOfertas = ofertasFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0);
-  const totalDespesas = despesasFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0);
+  // Memoized totals calculation to prevent unnecessary work on non-data renders
+  const totalDizimos = React.useMemo(() => dizimosFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0), [dizimosFiltered]);
+  const totalOfertas = React.useMemo(() => ofertasFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0), [ofertasFiltered]);
+  const totalDespesas = React.useMemo(() => despesasFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0), [despesasFiltered]);
 
-  // Export Dashboard as PNG image
+  // Export Dashboard as PNG image (Dynamic import for bundle optimization)
   const handleExportPng = async () => {
     if (!dashboardRef.current) return;
     setIsExporting(true);
     try {
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default || html2canvasModule;
       const canvas = await html2canvas(dashboardRef.current, {
         backgroundColor: '#0b0f19',
         scale: 2,
@@ -188,8 +183,8 @@ export default function App() {
       <main style={{ flex: 1, maxWidth: '1320px', width: '100%', margin: '0 auto', padding: '24px 16px' }} ref={dashboardRef}>
         
         {loading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <div className="animate-spin" style={{
+          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }} role="status" aria-live="polite">
+            <div className="animate-spin" aria-hidden="true" style={{
               width: 36,
               height: 36,
               border: '3px solid var(--border-color)',
@@ -197,7 +192,7 @@ export default function App() {
               borderRadius: '50%',
               margin: '0 auto 16px auto'
             }}></div>
-            <p>Carregando dados da igreja...</p>
+            <p>Carregando dados da igreja…</p>
           </div>
         ) : (
           <>
@@ -230,6 +225,9 @@ export default function App() {
                   dizimosMonth={dizimosFiltered}
                   ofertasMonth={ofertasFiltered}
                   despesasMonth={despesasFiltered}
+                  totalDizimos={totalDizimos}
+                  totalOfertas={totalOfertas}
+                  totalDespesas={totalDespesas}
                 />
 
                 {/* Detailed Data Tables */}
@@ -238,6 +236,8 @@ export default function App() {
                   ofertasMonth={ofertasFiltered}
                   despesasMonth={despesasFiltered}
                   membrosMap={membrosMap}
+                  viewMode={viewMode}
+                  isExporting={isExporting}
                 />
               </>
             )}
