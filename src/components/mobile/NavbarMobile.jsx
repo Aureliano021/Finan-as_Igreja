@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { Printer, Download, Settings, RefreshCw, LayoutDashboard, DatabaseZap, MoreVertical, ShieldCheck, Database, AlertCircle } from 'lucide-react';
+import UserMenu from '../UserMenu';
+
 
 export default function NavbarMobile({
   mainTab,
@@ -41,13 +43,11 @@ export default function NavbarMobile({
 
   const getStatusColor = () => {
     if (connectionStatus.status === 'online') return '#10b981';
-    if (connectionStatus.status === 'mock') return '#f59e0b';
     return '#ef4444';
   };
 
   const getStatusLabel = () => {
     if (connectionStatus.status === 'online') return 'API Online';
-    if (connectionStatus.status === 'mock') return 'Modo Mock';
     return 'API Offline';
   };
 
@@ -130,7 +130,11 @@ export default function NavbarMobile({
           {/* Right Action LED + Menu Button */}
           <div ref={menuRef} style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
             
+            {/* User Identification Avatar / Login Button */}
+            <UserMenu isMobile={true} isScrolled={isScrolled} />
+
             {/* Status LED Pill Button */}
+
             <button
               onClick={onOpenConfig}
               title={getStatusLabel()}
@@ -155,7 +159,7 @@ export default function NavbarMobile({
                 animation: connectionStatus.status === 'online' ? 'pulse 2s infinite' : 'none'
               }} />
               <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                {connectionStatus.status === 'online' ? 'API' : connectionStatus.status === 'mock' ? 'Mock' : 'Off'}
+                {connectionStatus.status === 'online' ? 'API' : 'Off'}
               </span>
             </button>
 
@@ -200,8 +204,6 @@ export default function NavbarMobile({
                 <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
                   {connectionStatus.status === 'online' ? (
                     <ShieldCheck size={14} color="#10b981" />
-                  ) : connectionStatus.status === 'mock' ? (
-                    <Database size={14} color="#f59e0b" />
                   ) : (
                     <AlertCircle size={14} color="#ef4444" />
                   )}
@@ -283,6 +285,27 @@ export default function NavbarMobile({
                     {isExporting ? 'Exportando…' : 'Exportar Imagem PNG'}
                   </button>
                 )}
+                <a
+                  href="/gerenciar.html"
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    border: 'none',
+                    background: 'transparent',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    textDecoration: 'none'
+                  }}
+                  className="mobile-popover-item"
+                >
+                  <Database size={15} color="var(--text-muted)" />
+                  Gerenciar Dados
+                </a>
 
                 <button
                   onClick={() => { setMenuOpen(false); onOpenConfig(); }}
@@ -304,7 +327,7 @@ export default function NavbarMobile({
                   className="mobile-popover-item"
                 >
                   <Settings size={15} color="var(--text-muted)" />
-                  Configurações da API
+                  Configurar API
                 </button>
               </div>
             )}
@@ -312,17 +335,17 @@ export default function NavbarMobile({
         </div>
       </header>
 
-      {/* 🌊 FLOATING LIQUID GLASS BOTTOM NAVIGATION DOCK PILL */}
-      <nav className="mobile-bottom-dock no-print" style={{
+      {/* 📱 BOTTOM NAVIGATION DOCK WITH GLASSMORPHISM */}
+      <nav style={{
         position: 'fixed',
-        bottom: '16px',
+        bottom: '12px',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: 'calc(100% - 32px)',
-        maxWidth: '400px',
-        zIndex: 999,
+        zIndex: 150,
+        width: 'calc(100% - 24px)',
+        maxWidth: '440px',
         pointerEvents: 'none'
-      }}>
+      }} className="no-print">
         <div style={{
           pointerEvents: 'auto',
           position: 'relative',
@@ -334,7 +357,7 @@ export default function NavbarMobile({
           padding: '4px',
           boxShadow: '0 16px 40px -8px rgba(15, 23, 42, 0.18), inset 0 1px 2px rgba(255, 255, 255, 0.95)',
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: '1fr 1fr 1fr',
           gap: '4px'
         }}>
           
@@ -343,8 +366,8 @@ export default function NavbarMobile({
             position: 'absolute',
             top: '4px',
             bottom: '4px',
-            left: mainTab === 'dashboard' ? '4px' : 'calc(50% + 2px)',
-            width: 'calc(50% - 6px)',
+            left: mainTab === 'dashboard' ? '4px' : mainTab === 'explorer' ? 'calc(33.33% + 2px)' : 'calc(66.66% + 2px)',
+            width: 'calc(33.33% - 6px)',
             background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
             borderRadius: '9999px',
             boxShadow: '0 4px 14px rgba(21, 101, 192, 0.35)',
@@ -361,22 +384,22 @@ export default function NavbarMobile({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
+              gap: '6px',
               height: '44px',
               border: 'none',
               background: 'transparent',
               borderRadius: '9999px',
               color: mainTab === 'dashboard' ? '#ffffff' : 'var(--text-secondary)',
               fontFamily: 'var(--font-sans)',
-              fontSize: '0.825rem',
+              fontSize: '0.78rem',
               fontWeight: mainTab === 'dashboard' ? 800 : 600,
               cursor: 'pointer',
               transition: 'color 0.2s ease',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <LayoutDashboard size={17} />
-            <span>Painel & Balanço</span>
+            <LayoutDashboard size={15} />
+            <span>Painel</span>
           </button>
 
           {/* Tab 2 Button: Explorer */}
@@ -388,23 +411,50 @@ export default function NavbarMobile({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
+              gap: '6px',
               height: '44px',
               border: 'none',
               background: 'transparent',
               borderRadius: '9999px',
               color: mainTab === 'explorer' ? '#ffffff' : 'var(--text-secondary)',
               fontFamily: 'var(--font-sans)',
-              fontSize: '0.825rem',
+              fontSize: '0.78rem',
               fontWeight: mainTab === 'explorer' ? 800 : 600,
               cursor: 'pointer',
               transition: 'color 0.2s ease',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <DatabaseZap size={17} />
-            <span>Cadastros & Listas</span>
+            <DatabaseZap size={15} />
+            <span>Cadastros</span>
           </button>
+
+          {/* Tab 3 Link: Gerenciar */}
+          <a
+            href="/gerenciar.html"
+            style={{
+              position: 'relative',
+              zIndex: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              height: '44px',
+              border: 'none',
+              background: 'transparent',
+              borderRadius: '9999px',
+              color: mainTab === 'gerenciar' ? '#ffffff' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: '0.78rem',
+              fontWeight: mainTab === 'gerenciar' ? 800 : 600,
+              textDecoration: 'none',
+              transition: 'color 0.2s ease',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Database size={15} />
+            <span>Editar</span>
+          </a>
 
         </div>
       </nav>

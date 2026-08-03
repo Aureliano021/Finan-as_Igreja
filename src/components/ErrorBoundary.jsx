@@ -1,6 +1,5 @@
 import React from 'react';
-import { AlertOctagon, RefreshCw, Database } from 'lucide-react';
-import { setMockModeForced } from '../services/api';
+import { AlertOctagon, RefreshCw } from 'lucide-react';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,11 +14,6 @@ export default class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary capturou um erro de renderização:", error, errorInfo);
   }
-
-  handleForceMock = () => {
-    setMockModeForced(true);
-    window.location.reload();
-  };
 
   handleReload = () => {
     window.location.reload();
@@ -98,14 +92,14 @@ export default class ErrorBoundary extends React.Component {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button 
-                onClick={this.handleForceMock}
+                onClick={this.handleReload}
                 style={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  color: 'white',
+                  background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                  color: '#ffffff',
                   border: 'none',
                   padding: '12px 18px',
                   borderRadius: '8px',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -113,27 +107,8 @@ export default class ErrorBoundary extends React.Component {
                   gap: '8px'
                 }}
               >
-                <Database size={16} />
-                Ativar Modo Mock (Dados Fictícios Seguros)
-              </button>
-
-              <button 
-                onClick={this.handleReload}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: '#f8fafc',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  padding: '10px 18px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <RefreshCw size={14} />
-                Recarregar Página
+                <RefreshCw size={15} />
+                Recarregar Aplicação
               </button>
             </div>
           </div>

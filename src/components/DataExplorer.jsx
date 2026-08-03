@@ -68,10 +68,8 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
     return safeMembros.filter(m => {
       if (!m) return false;
       const nome = (m.nome || '').toLowerCase();
-      const cpf = (m.cpf || '').toLowerCase();
-      const email = (m.email || '').toLowerCase();
-      const celular = (m.celular || '').toLowerCase();
-      return nome.includes(search) || cpf.includes(search) || email.includes(search) || celular.includes(search);
+      const dateFormatted = m.data_nascimento ? formatDateBR(m.data_nascimento) : '';
+      return nome.includes(search) || dateFormatted.includes(search) || String(m.id).includes(search);
     });
   }, [safeMembros, search]);
 
@@ -127,8 +125,11 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
           gap: '16px'
         }}>
           {/* Entity Sub-tabs */}
-          <div className="tab-list" style={{ flex: '1 1 300px', minWidth: 0 }}>
+          <div className="tab-list" role="tablist" aria-label="Abas do Explorador de Dados" style={{ flex: '1 1 300px', minWidth: 0 }}>
             <button
+              role="tab"
+              aria-selected={subTab === 'membros'}
+              aria-controls="tabpanel-membros"
               className={`tab-button ${subTab === 'membros' ? 'active' : ''}`}
               onClick={() => handleTabChange('membros')}
             >
@@ -137,6 +138,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             </button>
 
             <button
+              role="tab"
+              aria-selected={subTab === 'dizimos'}
+              aria-controls="tabpanel-dizimos"
               className={`tab-button ${subTab === 'dizimos' ? 'active' : ''}`}
               onClick={() => handleTabChange('dizimos')}
             >
@@ -145,6 +149,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             </button>
 
             <button
+              role="tab"
+              aria-selected={subTab === 'ofertas'}
+              aria-controls="tabpanel-ofertas"
               className={`tab-button ${subTab === 'ofertas' ? 'active' : ''}`}
               onClick={() => handleTabChange('ofertas')}
             >
@@ -153,6 +160,9 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
             </button>
 
             <button
+              role="tab"
+              aria-selected={subTab === 'despesas'}
+              aria-controls="tabpanel-despesas"
               className={`tab-button ${subTab === 'despesas' ? 'active' : ''}`}
               onClick={() => handleTabChange('despesas')}
             >
@@ -210,6 +220,13 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{m.id}</span>
                   </div>
 
+                  {m.data_nascimento && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={12} color="var(--text-muted)" />
+                      Nascimento: {formatDateBR(m.data_nascimento)}
+                    </span>
+                  )}
+
                   {/* 3 Boolean Badges (Forced on 1 Single Line) */}
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap', width: '100%', alignItems: 'center' }}>
                     {/* Boolean 1: Membro */}
@@ -240,27 +257,20 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                       {m.batizado ? <Check size={10} /> : <X size={10} />} Batizado
                     </span>
 
-                    {/* Boolean 3: União Estável */}
+                    {/* Boolean 3: Dizimista / União Estável */}
                     <span className="badge" style={{
                       flex: 1,
                       justifyContent: 'center',
-                      background: m.uniao_estavel ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
-                      color: m.uniao_estavel ? '#c084fc' : 'var(--text-muted)',
-                      border: `1px solid ${m.uniao_estavel ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
+                      background: (m.dizimista ?? m.uniao_estavel) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+                      color: (m.dizimista ?? m.uniao_estavel) ? '#c084fc' : 'var(--text-muted)',
+                      border: `1px solid ${(m.dizimista ?? m.uniao_estavel) ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
                       fontSize: '0.62rem',
                       padding: '3px 4px',
                       whiteSpace: 'nowrap'
                     }}>
-                      {m.uniao_estavel ? <Check size={10} /> : <X size={10} />} União Est.
+                      {(m.dizimista ?? m.uniao_estavel) ? <Check size={10} /> : <X size={10} />} {m.dizimista !== undefined ? 'Dizimista' : 'União Est.'}
                     </span>
                   </div>
-
-                  {(m.celular || m.email || m.cpf) && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {m.celular && <span><Phone size={10} /> {m.celular}</span>}
-                      {m.cpf && <span>CPF: {maskCpf(m.cpf)}</span>}
-                    </div>
-                  )}
                 </div>
               ))
             ) : (
@@ -277,9 +287,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                 <tr>
                   <th scope="col">ID</th>
                   <th scope="col">Nome Completo</th>
-                  <th scope="col">CPF</th>
-                  <th scope="col">Contato (Email / Celular)</th>
-                  <th scope="col">Endereço / CEP</th>
+                  <th scope="col">Data de Nascimento</th>
                   <th scope="col">Situação do Membro</th>
                 </tr>
               </thead>
@@ -292,23 +300,14 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                       </td>
                       <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                         {m.nome}
-                        {m.data_nascimento && (
-                          <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                            Nascimento: {formatDateBR(m.data_nascimento)}
-                          </span>
-                        )}
                       </td>
                       <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {maskCpf(m.cpf)}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        {m.email && <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={12} /> {m.email}</div>}
-                        {m.celular && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><Phone size={12} /> {m.celular}</div>}
-                        {!m.email && !m.celular && '-'}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        {m.endereco || '-'}
-                        {m.cep && <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>CEP: {m.cep}</span>}
+                        {m.data_nascimento ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={14} color="var(--text-muted)" />
+                            {formatDateBR(m.data_nascimento)}
+                          </span>
+                        ) : '-'}
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: '4px', alignItems: 'center' }}>
@@ -333,13 +332,13 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                           </span>
 
                           <span className="badge" style={{
-                            background: m.uniao_estavel ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
-                            color: m.uniao_estavel ? '#c084fc' : 'var(--text-muted)',
-                            border: `1px solid ${m.uniao_estavel ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
+                            background: (m.dizimista ?? m.uniao_estavel) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+                            color: (m.dizimista ?? m.uniao_estavel) ? '#c084fc' : 'var(--text-muted)',
+                            border: `1px solid ${(m.dizimista ?? m.uniao_estavel) ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
                             fontSize: '0.68rem',
                             whiteSpace: 'nowrap'
                           }}>
-                            {m.uniao_estavel ? <Check size={10} /> : <X size={10} />} União Est.
+                            {(m.dizimista ?? m.uniao_estavel) ? <Check size={10} /> : <X size={10} />} {m.dizimista !== undefined ? 'Dizimista' : 'União Est.'}
                           </span>
                         </div>
                       </td>
@@ -347,7 +346,7 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                       Nenhum membro encontrado.
                     </td>
                   </tr>

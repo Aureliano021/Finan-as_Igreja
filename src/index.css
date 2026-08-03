@@ -979,6 +979,22 @@ body {
   }
 }
 
+/* Spinner Animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  transform-origin: center;
+}
+
 .mobile-popover-item:hover,
 .mobile-popover-item:active {
   background: rgba(241, 245, 249, 0.9) !important;
@@ -1050,4 +1066,33 @@ body {
 
 .print-only {
   display: none;
+}
+
+/* ==========================================================================
+   REACT 19 VIEW TRANSITIONS & ACCESSIBILITY
+   ========================================================================== */
+@keyframes vt-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+
+::view-transition-old(fade-out) {
+  animation: 150ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out;
+}
+
+::view-transition-new(fade-in) {
+  animation: 200ms cubic-bezier(0, 0, 0.2, 1) both vt-fade-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

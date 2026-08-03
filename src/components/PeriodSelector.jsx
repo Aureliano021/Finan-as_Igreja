@@ -75,8 +75,10 @@ export default function PeriodSelector({
         </div>
 
         {/* Fixed Width Pill Selector (Placed to the RIGHT) */}
-        <div className="tab-list" style={{ flex: '0 0 auto', width: '280px' }}>
+        <div className="tab-list" role="tablist" aria-label="Modo de Visualização do Período" style={{ flex: '0 0 auto', width: '280px' }}>
           <button
+            role="tab"
+            aria-selected={viewMode === 'month'}
             className={`tab-button ${viewMode === 'month' ? 'active' : ''}`}
             onClick={() => onChangeViewMode('month')}
             style={{ whiteSpace: 'nowrap' }}
@@ -86,6 +88,8 @@ export default function PeriodSelector({
           </button>
 
           <button
+            role="tab"
+            aria-selected={viewMode === 'year'}
             className={`tab-button ${viewMode === 'year' ? 'active' : ''}`}
             onClick={() => onChangeViewMode('year')}
             style={{ whiteSpace: 'nowrap' }}

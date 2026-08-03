@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { X, Server, CheckCircle2, AlertTriangle, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
-import { getApiUrl, setApiUrl, isMockModeForced, setMockModeForced, checkApiHealth } from '../services/api';
+import { X, Server, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { getApiUrl, setApiUrl, checkApiHealth } from '../services/api';
 
 export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
   const [url, setUrlInput] = useState(getApiUrl());
-  const [useMock, setUseMockState] = useState(isMockModeForced());
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
 
@@ -21,7 +20,6 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
 
   const handleSave = () => {
     setApiUrl(url);
-    setMockModeForced(useMock);
     onSaved();
     onClose();
   };
@@ -64,10 +62,11 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
         {/* Form Body */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label htmlFor="api-url-input" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
               URL da API Python (FastAPI):
             </label>
             <input 
+              id="api-url-input"
               type="url" 
               name="apiUrl"
               autoComplete="off"
@@ -78,38 +77,10 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="http://localhost:8000…"
             />
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-              Certifique-se de habilitar o CORSMiddleware em seu <code>controller.py</code>.
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block', lineHeight: '1.4' }}>
+              • Para acesso mobile na mesma Wi-Fi, inicie o backend com: <code>uvicorn main:app --host 0.0.0.0 --port 8000</code><br />
+              • Certifique-se de habilitar o <code>CORSMiddleware</code> no backend permitindo a origem do celular.
             </span>
-          </div>
-
-          {/* Toggle Mock Mode */}
-          <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            padding: '12px 16px',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div>
-              <strong style={{ fontSize: '0.875rem', color: 'var(--text-primary)', display: 'block' }}>
-                Forçar Modo Mock (Dados Fictícios)
-              </strong>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                Utilize para apresentações ou quando o banco não estiver ativo.
-              </span>
-            </div>
-            <button 
-              onClick={() => setUseMockState(!useMock)}
-              role="switch"
-              aria-checked={useMock}
-              aria-label="Forçar Modo Mock"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: useMock ? '#fbbf24' : 'var(--text-muted)' }}
-            >
-              {useMock ? <ToggleRight size={32} aria-hidden="true" /> : <ToggleLeft size={32} aria-hidden="true" />}
-            </button>
           </div>
 
           {/* Connection Test Box */}
@@ -139,7 +110,7 @@ export default function ApiConfigModal({ isOpen, onClose, onSaved }) {
               style={{ flex: 1 }}
             >
               <RefreshCw size={14} className={testing ? 'animate-spin' : ''} />
-              {testing ? 'Testando...' : 'Testar Conexão'}
+              {testing ? 'Testando…' : 'Testar Conexão'}
             </button>
             <button 
               onClick={handleSave} 

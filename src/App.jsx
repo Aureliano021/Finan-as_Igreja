@@ -8,8 +8,10 @@ import TransactionsTable from './components/TransactionsTable';
 import DataExplorer from './components/DataExplorer';
 import ApiConfigModal from './components/ApiConfigModal';
 import PrintableReport from './components/PrintableReport';
+import AccessNoticeCard from './components/AccessNoticeCard';
 
 import { fetchAllFinancialData } from './services/api';
+import { getStoredUser, getUserStatus, setAuth, getStoredToken } from './services/auth';
 import { isSameMonthAndYear } from './services/utils';
 
 /**
@@ -21,17 +23,21 @@ function filterByPeriod(items, viewMode, year, month) {
   if (viewMode === 'all') return items;
   return items.filter(item => {
     if (!item?.data) return false;
-    const parts = String(item.data).trim().split('T')[0].split('-');
+    const dateStr = String(item.data).trim().split('T')[0];
+    const parts = dateStr.split('-');
     if (parts.length < 2) return false;
     const y = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10);
     if (viewMode === 'year') return y === year;
-    return y === year && m === month && isSameMonthAndYear(item.data, year, month);
+    return y === year && m === month;
   });
 }
 
 export default function App() {
   const currentDate = new Date();
+
+  // Current logged in user & status
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
 
   // Main Top Tab ('dashboard' | 'explorer')
   const [mainTab, setMainTab] = useState('dashboard');
@@ -54,16 +60,61 @@ export default function App() {
 
   const dashboardRef = useRef(null);
 
-  // Load financial data
+  // Sync user state on auth events
+  useEffect(() => {
+    const syncUser = () => setCurrentUser(getStoredUser());
+    window.addEventListener('auth-change', syncUser);
+    window.addEventListener('storage', syncUser);
+    return () => {
+      window.removeEventListener('auth-change', syncUser);
+      window.removeEventListener('storage', syncUser);
+    };
+  }, []);
+
+  // Load financial data with safety timeout to prevent infinite loading screen
   const loadData = async () => {
     setLoading(true);
-    const data = await fetchAllFinancialData();
-    setMembros(Array.isArray(data.membros) ? data.membros : []);
-    setDizimos(Array.isArray(data.dizimos) ? data.dizimos : []);
-    setOfertas(Array.isArray(data.ofertas) ? data.ofertas : []);
-    setDespesas(Array.isArray(data.despesas) ? data.despesas : []);
-    setConnectionStatus({ status: data.status, message: data.message });
-    setLoading(false);
+
+    // Safety timeout: force stop loading spinner after 6 seconds max
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setConnectionStatus(prev => ({
+        ...prev,
+        message: prev.message || 'A conexão demorou para responder. Verifique se o servidor backend está ativo.'
+      }));
+    }, 6000);
+
+    try {
+      const data = await fetchAllFinancialData();
+      setMembros(Array.isArray(data?.membros) ? data.membros : []);
+      setDizimos(Array.isArray(data?.dizimos) ? data.dizimos : []);
+      setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
+      setDespesas(Array.isArray(data?.despesas) ? data.despesas : []);
+      setConnectionStatus({
+        status: data?.status || 'offline',
+        userStatus: data?.userStatus,
+        message: data?.message || 'Não foi possível obter dados da API.'
+      });
+
+      // If backend returned online (200 OK), user's access is active! Sync local user status to 'aceito'
+      if (data?.status === 'online') {
+        const stored = getStoredUser();
+        if (stored && getUserStatus(stored) !== 'aceito') {
+          const updatedUser = { ...stored, status: 'aceito' };
+          setAuth(getStoredToken(), updatedUser);
+          setCurrentUser(updatedUser);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados da API:', err);
+      setConnectionStatus({
+        status: 'offline',
+        message: 'Ocorreu um erro ao comunicar com a API Backend.'
+      });
+    } finally {
+      clearTimeout(safetyTimer);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -95,12 +146,13 @@ export default function App() {
     return { yearsMap, sortedYears };
   }, [dizimos, ofertas, despesas]);
 
-  // Auto-set selected year to most recent year with data if available
-  useEffect(() => {
-    if (!loading && availableYearsAndMonths.sortedYears.length > 0) {
-      setSelectedYear(prev => availableYearsAndMonths.sortedYears.includes(prev) ? prev : availableYearsAndMonths.sortedYears[0]);
+  // Derived effective selected year — ensures selectedYear falls back to most recent year with data
+  const effectiveSelectedYear = React.useMemo(() => {
+    if (availableYearsAndMonths.sortedYears.length > 0 && !availableYearsAndMonths.sortedYears.includes(selectedYear)) {
+      return availableYearsAndMonths.sortedYears[0];
     }
-  }, [loading, availableYearsAndMonths]);
+    return selectedYear;
+  }, [availableYearsAndMonths.sortedYears, selectedYear]);
 
   // Map member IDs to member objects for quick lookup
   const membrosMap = React.useMemo(() => {
@@ -117,18 +169,18 @@ export default function App() {
 
   // Filter datasets based on viewMode using shared filterByPeriod helper
   const dizimosFiltered = React.useMemo(
-    () => filterByPeriod(dizimos, viewMode, selectedYear, selectedMonth),
-    [dizimos, viewMode, selectedYear, selectedMonth]
+    () => filterByPeriod(dizimos, viewMode, effectiveSelectedYear, selectedMonth),
+    [dizimos, viewMode, effectiveSelectedYear, selectedMonth]
   );
 
   const ofertasFiltered = React.useMemo(
-    () => filterByPeriod(ofertas, viewMode, selectedYear, selectedMonth),
-    [ofertas, viewMode, selectedYear, selectedMonth]
+    () => filterByPeriod(ofertas, viewMode, effectiveSelectedYear, selectedMonth),
+    [ofertas, viewMode, effectiveSelectedYear, selectedMonth]
   );
 
   const despesasFiltered = React.useMemo(
-    () => filterByPeriod(despesas, viewMode, selectedYear, selectedMonth),
-    [despesas, viewMode, selectedYear, selectedMonth]
+    () => filterByPeriod(despesas, viewMode, effectiveSelectedYear, selectedMonth),
+    [despesas, viewMode, effectiveSelectedYear, selectedMonth]
   );
 
   // Memoized totals calculation to prevent unnecessary work on non-data renders
@@ -217,6 +269,68 @@ export default function App() {
             }}></div>
             <p>Carregando dados da igreja…</p>
           </div>
+        ) : connectionStatus.status === 'unauthenticated' ? (
+          <div style={{
+            maxWidth: '540px',
+            margin: '40px auto',
+            padding: '32px',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '24px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.08)',
+            textAlign: 'center'
+          }} role="alert">
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto'
+            }}>
+              🔒
+            </div>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 8px 0' }}>
+              Autenticação Necessária
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>
+              {connectionStatus.message || 'Sessão expirada ou não autenticada. Por favor, entre com sua conta.'}
+            </p>
+            <a
+              href="/login.html"
+              style={{
+                display: 'inline-block',
+                padding: '12px 24px',
+                borderRadius: '9999px',
+                background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                color: '#ffffff',
+                fontWeight: 800,
+                fontSize: '0.875rem',
+                textDecoration: 'none',
+                boxShadow: '0 4px 14px rgba(21, 101, 192, 0.3)'
+              }}
+            >
+              Fazer Login / Criar Conta
+            </a>
+          </div>
+        ) : connectionStatus.status === 'offline' ? (
+          <AccessNoticeCard
+            status="offline"
+            user={currentUser}
+            onRefreshData={loadData}
+            message={connectionStatus.message || 'O servidor de API Backend está desligado (funciona sob demanda). Peça ao administrador para ligar o servidor.'}
+          />
+        ) : connectionStatus.status === 'pending_approval' ? (
+          <AccessNoticeCard
+            status={connectionStatus.userStatus || getUserStatus(currentUser) || 'pendente'}
+            user={currentUser}
+            onRefreshData={loadData}
+            message={connectionStatus.message}
+          />
         ) : (
           <>
             {/* MAIN TAB 1: PAINEL & GRÁFICOS */}
@@ -226,7 +340,7 @@ export default function App() {
                 <PeriodSelector
                   viewMode={viewMode}
                   onChangeViewMode={setViewMode}
-                  selectedYear={selectedYear}
+                  selectedYear={effectiveSelectedYear}
                   selectedMonth={selectedMonth}
                   onChangeYear={setSelectedYear}
                   onChangeMonth={setSelectedMonth}
@@ -304,7 +418,7 @@ export default function App() {
 
       {/* Printable PDF A4 Report Component */}
       <PrintableReport
-        selectedYear={selectedYear}
+        selectedYear={effectiveSelectedYear}
         selectedMonth={selectedMonth}
         dizimosMonth={dizimosFiltered}
         ofertasMonth={ofertasFiltered}
