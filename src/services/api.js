@@ -48,7 +48,7 @@ export function setApiUrl(url) {
 }
 
 function normalizeEndpoint(endpoint) {
-  if (endpoint === 'membros' || endpoint === 'membro') return 'membro';
+  if (endpoint === 'membro' || endpoint === 'membros') return 'membros';
   return endpoint;
 }
 
@@ -69,7 +69,7 @@ export async function checkApiHealth() {
 
     let res;
     try {
-      res = await fetch(`${baseUrl}/membro`, {
+      res = await fetch(`${baseUrl}/membros`, {
         method: 'GET',
         headers,
         signal: controller.signal
@@ -77,7 +77,7 @@ export async function checkApiHealth() {
     } catch (primaryErr) {
       const fallbackUrl = getFallbackApiUrl(baseUrl);
       if (fallbackUrl && fallbackUrl !== baseUrl) {
-        res = await fetch(`${fallbackUrl}/membro`, {
+        res = await fetch(`${fallbackUrl}/membros`, {
           method: 'GET',
           headers,
           signal: controller.signal
@@ -217,7 +217,8 @@ export async function fetchAllFinancialData() {
 
   try {
     const [membrosData, dizimosData, ofertasData, despesasData] = await Promise.all([
-      safeFetchJson(`${baseUrl}/membro`),
+      safeFetchJson(`${baseUrl}/membros`),
+
       safeFetchJson(`${baseUrl}/dizimos`),
       safeFetchJson(`${baseUrl}/ofertas`),
       safeFetchJson(`${baseUrl}/despesas`)
