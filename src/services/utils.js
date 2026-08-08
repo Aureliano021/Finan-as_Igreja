@@ -14,10 +14,31 @@ export function maskCpf(cpf) {
 }
 
 /**
+ * Parse any numeric value safely (handles numbers, strings, and formatted currency "R$ 1.250,50")
+ */
+export function parseNumericValue(value) {
+  if (value == null) return 0;
+  if (typeof value === 'number') return isNaN(value) ? 0 : value;
+  if (typeof value === 'string') {
+    const cleanStr = value.replace(/R\$\s?/, '').trim();
+    if (!cleanStr) return 0;
+    // Check if format uses Brazilian comma for decimal (e.g. "1.250,50" or "250,50")
+    if (cleanStr.includes(',')) {
+      const normalized = cleanStr.replace(/\./g, '').replace(',', '.');
+      const parsed = parseFloat(normalized);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    const parsed = parseFloat(cleanStr);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+/**
  * Format a numeric value to Brazilian Real currency (R$ 1.250,00)
  */
 export function formatCurrency(value) {
-  const numericVal = Number(value) || 0;
+  const numericVal = parseNumericValue(value);
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
@@ -25,16 +46,92 @@ export function formatCurrency(value) {
 }
 
 /**
+ * Extract numeric value from a financial record trying all common backend property names
+ */
+export function getRecordValue(item) {
+  if (!item) return 0;
+  const raw = item.valor ?? item.valor_pago ?? item.amount ?? item.value ?? item.val ?? 0;
+  return parseNumericValue(raw);
+}
+
+/**
+ * Parse any date representation (ISO "2026-08-05", BR "05/08/2026", timestamp) into year, month, day components
+ */
+export function parseDateParts(dateValue) {
+  if (!dateValue) return { year: null, month: null, day: null, iso: '' };
+  const str = String(dateValue).trim().split('T')[0].split(' ')[0];
+  
+  if (str.includes('-')) {
+    const p = str.split('-');
+    if (p.length === 3) {
+      // Could be YYYY-MM-DD or DD-MM-YYYY
+      if (p[0].length === 4) {
+        const y = parseInt(p[0], 10);
+        const m = parseInt(p[1], 10);
+        const d = parseInt(p[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          return { year: y, month: m, day: d, iso };
+        }
+      } else if (p[2].length === 4) {
+        const d = parseInt(p[0], 10);
+        const m = parseInt(p[1], 10);
+        const y = parseInt(p[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          return { year: y, month: m, day: d, iso };
+        }
+      }
+    }
+  }
+  
+  if (str.includes('/')) {
+    const p = str.split('/');
+    if (p.length === 3) {
+      if (p[0].length === 4) {
+        const y = parseInt(p[0], 10);
+        const m = parseInt(p[1], 10);
+        const d = parseInt(p[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          return { year: y, month: m, day: d, iso };
+        }
+      } else if (p[2].length === 4) {
+        const d = parseInt(p[0], 10);
+        const m = parseInt(p[1], 10);
+        const y = parseInt(p[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          return { year: y, month: m, day: d, iso };
+        }
+      }
+    }
+  }
+
+  return { year: null, month: null, day: null, iso: str };
+}
+
+/**
+ * Extract clean date string (YYYY-MM-DD) from a record trying all common backend date property names
+ */
+export function getRecordDate(item) {
+  if (!item) return '';
+  const rawDate = item.data ?? item.data_despesa ?? item.data_oferta ?? item.date ?? item.created_at ?? item.data_criacao ?? '';
+  if (!rawDate) return '';
+  const { iso } = parseDateParts(rawDate);
+  return iso || String(rawDate).trim().split('T')[0].split(' ')[0];
+}
+
+/**
  * Format ISO date string (YYYY-MM-DD) to Brazilian date format (DD/MM/YYYY)
  */
 export function formatDateBR(dateString) {
   if (!dateString) return '-';
-  const str = String(dateString).trim().split('T')[0];
-  const parts = str.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const { year, month, day } = parseDateParts(dateString);
+  if (year && month && day) {
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
   }
-  return dateString;
+  return String(dateString);
 }
 
 /**

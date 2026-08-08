@@ -12,7 +12,7 @@ import AccessNoticeCard from './components/AccessNoticeCard';
 
 import { fetchAllFinancialData } from './services/api';
 import { getStoredUser, getUserStatus, setAuth, getStoredToken } from './services/auth';
-import { isSameMonthAndYear } from './services/utils';
+import { isSameMonthAndYear, getRecordDate, getRecordValue, parseDateParts } from './services/utils';
 
 /**
  * Generic period filter — avoids duplicating the same logic for each entity.
@@ -22,14 +22,12 @@ function filterByPeriod(items, viewMode, year, month) {
   if (!Array.isArray(items)) return [];
   if (viewMode === 'all') return items;
   return items.filter(item => {
-    if (!item?.data) return false;
-    const dateStr = String(item.data).trim().split('T')[0];
-    const parts = dateStr.split('-');
-    if (parts.length < 2) return false;
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    if (viewMode === 'year') return y === year;
-    return y === year && m === month;
+    const rawDate = item?.data ?? item?.data_despesa ?? item?.data_oferta ?? item?.date ?? item?.created_at ?? item?.data_criacao;
+    if (!rawDate) return true; // Include records even if date is missing
+    const { year: itemYear, month: itemMonth } = parseDateParts(rawDate);
+    if (!itemYear || !itemMonth) return true; // Include records if unparseable rather than dropping to 0
+    if (viewMode === 'year') return itemYear === year;
+    return itemYear === year && itemMonth === month;
   });
 }
 
@@ -127,9 +125,9 @@ export default function App() {
     const allRecords = [...dizimos, ...ofertas, ...despesas];
 
     allRecords.forEach(item => {
-      if (!item || !item.data) return;
-      const str = String(item.data).trim().split('T')[0];
-      const parts = str.split('-');
+      const dateStr = getRecordDate(item);
+      if (!dateStr) return;
+      const parts = dateStr.split('-');
       if (parts.length >= 2) {
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
@@ -184,9 +182,9 @@ export default function App() {
   );
 
   // Memoized totals calculation to prevent unnecessary work on non-data renders
-  const totalDizimos = React.useMemo(() => dizimosFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0), [dizimosFiltered]);
-  const totalOfertas = React.useMemo(() => ofertasFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0), [ofertasFiltered]);
-  const totalDespesas = React.useMemo(() => despesasFiltered.reduce((acc, item) => acc + (Number(item?.valor) || 0), 0), [despesasFiltered]);
+  const totalDizimos = React.useMemo(() => dizimosFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [dizimosFiltered]);
+  const totalOfertas = React.useMemo(() => ofertasFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [ofertasFiltered]);
+  const totalDespesas = React.useMemo(() => despesasFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [despesasFiltered]);
 
   // Export Dashboard as PNG image (Dynamic import for bundle optimization)
   const handleExportPng = async () => {
@@ -196,9 +194,55 @@ export default function App() {
       const html2canvasModule = await import('html2canvas');
       const html2canvas = html2canvasModule.default || html2canvasModule;
       const canvas = await html2canvas(dashboardRef.current, {
-        backgroundColor: '#0b0f19',
+        backgroundColor: '#eef2ff',
         scale: 2,
-        useCORS: true
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc, element) => {
+          // 1. Replicate website's ambient glass background
+          element.style.background = 'linear-gradient(135deg, #eef2ff 0%, #f0fdf4 50%, #f8fafc 100%)';
+          element.style.padding = '28px';
+          element.style.borderRadius = '24px';
+          element.style.boxSizing = 'border-box';
+
+          // 2. High contrast cards floating above background
+          const cards = element.querySelectorAll('.glass-card, .kpi-card');
+          cards.forEach(c => {
+            c.style.background = '#ffffff';
+            c.style.border = '1px solid rgba(226, 232, 240, 0.9)';
+            c.style.boxShadow = '0 10px 25px -4px rgba(15, 23, 42, 0.08)';
+            c.style.borderRadius = '18px';
+            c.style.backdropFilter = 'none';
+          });
+
+          // 3. Elegant Developer Credit & Certification Footer Badge
+          const footer = clonedDoc.createElement('div');
+          footer.style.marginTop = '28px';
+          footer.style.padding = '14px 20px';
+          footer.style.background = '#ffffff';
+          footer.style.border = '1px solid rgba(21, 101, 192, 0.25)';
+          footer.style.borderRadius = '16px';
+          footer.style.display = 'flex';
+          footer.style.alignItems = 'center';
+          footer.style.justifyContent = 'space-between';
+          footer.style.flexWrap = 'wrap';
+          footer.style.gap = '12px';
+          footer.style.boxShadow = '0 4px 16px rgba(15, 23, 42, 0.05)';
+          footer.innerHTML = `
+            <div style="display: flex; alignItems: center; gap: 10px;">
+              <span style="background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%); color: #ffffff; padding: 5px 12px; border-radius: 999px; font-weight: 800; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;">
+                FINANÇAS IGREJA
+              </span>
+              <span style="font-size: 0.8rem; color: #475569; font-weight: 700;">
+                Relatório de Prestação de Contas
+              </span>
+            </div>
+            <div style="font-size: 0.8rem; color: #475569; font-weight: 600;">
+              Sistema desenvolvido por <strong style="color: #0f172a; font-weight: 800;">Aureliano Peixoto Neto</strong>, com o auxílio de Inteligência Artificial
+            </div>
+          `;
+          element.appendChild(footer);
+        }
       });
       const image = canvas.toDataURL('image/png');
       const link = document.createElement('a');

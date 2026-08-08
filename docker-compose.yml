@@ -5,7 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     container_name: igreja_financas_app
     restart: always
-    ports:
-      - "80:80"
+    network_mode: host
+    ipc: host

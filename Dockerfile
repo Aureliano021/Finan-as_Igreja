@@ -1,12 +1,15 @@
-# Servidor Web de Produção leve (Nginx Alpine)
+# Estágio 1: Build da aplicação React
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+COPY . .
+RUN npm run build
+
+# Estágio 2: Servidor Nginx de Produção
 FROM nginx:alpine
-
-# Copia a configuração do Nginx para suporte a Single Page Application (React)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copia a pasta dist compilada
-COPY dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]

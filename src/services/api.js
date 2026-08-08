@@ -47,6 +47,11 @@ export function setApiUrl(url) {
   }
 }
 
+function normalizeEndpoint(endpoint) {
+  if (endpoint === 'membros' || endpoint === 'membro') return 'membro';
+  return endpoint;
+}
+
 /**
  * Ping backend API to check if accessible
  */
@@ -64,7 +69,7 @@ export async function checkApiHealth() {
 
     let res;
     try {
-      res = await fetch(`${baseUrl}/membros`, {
+      res = await fetch(`${baseUrl}/membro`, {
         method: 'GET',
         headers,
         signal: controller.signal
@@ -72,7 +77,7 @@ export async function checkApiHealth() {
     } catch (primaryErr) {
       const fallbackUrl = getFallbackApiUrl(baseUrl);
       if (fallbackUrl && fallbackUrl !== baseUrl) {
-        res = await fetch(`${fallbackUrl}/membros`, {
+        res = await fetch(`${fallbackUrl}/membro`, {
           method: 'GET',
           headers,
           signal: controller.signal
@@ -97,11 +102,11 @@ export async function checkApiHealth() {
 
 /**
  * Helper to fetch single endpoint safely catching CORS and network errors
- * Uses a 5-second timeout to avoid blocking Promise.all indefinitely
+ * Uses a 4-second timeout to avoid blocking Promise.all indefinitely
  */
 async function safeFetchJson(url) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 seconds timeout
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
   
   try {
     const headers = {};
@@ -125,6 +130,7 @@ async function safeFetchJson(url) {
     }
 
     if (res.status === 401) {
+      console.warn(`[API 401] ${url}`);
       return { unauthenticated: true };
     }
 
@@ -132,15 +138,58 @@ async function safeFetchJson(url) {
       const errData = await res.json().catch(() => null);
       const detail = errData?.detail || errData?.message || '';
       const isDenied = typeof detail === 'string' && (detail.toLowerCase().includes('negado') || detail.toLowerCase().includes('denied'));
+      console.warn(`[API 403] ${url}: ${detail}`);
       return { forbidden: true, status: isDenied ? 'negado' : 'pendente', detail };
     }
 
+    // Singular / Plural 404 fallback
+    if (res.status === 404) {
+      console.warn(`[API 404] ${url} - tentando variação de endpoint...`);
+      let altUrl = null;
+      if (url.endsWith('/ofertas')) altUrl = url.replace(/\/ofertas$/, '/oferta');
+      else if (url.endsWith('/oferta')) altUrl = url.replace(/\/oferta$/, '/ofertas');
+      else if (url.endsWith('/despesas')) altUrl = url.replace(/\/despesas$/, '/despesa');
+      else if (url.endsWith('/despesa')) altUrl = url.replace(/\/despesa$/, '/despesas');
+      else if (url.endsWith('/dizimos')) altUrl = url.replace(/\/dizimos$/, '/dizimo');
+      else if (url.endsWith('/dizimo')) altUrl = url.replace(/\/dizimo$/, '/dizimos');
+      else if (url.endsWith('/membro')) altUrl = url.replace(/\/membro$/, '/membros');
+      else if (url.endsWith('/membros')) altUrl = url.replace(/\/membros$/, '/membro');
+
+      if (altUrl) {
+        const altRes = await fetch(altUrl, { headers, signal: controller.signal }).catch(() => null);
+        if (altRes && altRes.ok) {
+          res = altRes;
+          console.info(`[API 404 Fallback OK] Utilizando resposta de ${altUrl}`);
+        }
+      }
+    }
+
     if (res.ok) {
-      const json = await res.json();
-      return Array.isArray(json) ? json : [];
+      const json = await res.json().catch(() => null);
+      console.log(`[API Direct Response] ${url}:`, json);
+      if (Array.isArray(json)) return json;
+      if (json && typeof json === 'object') {
+        if (Array.isArray(json.data)) return json.data;
+        if (Array.isArray(json.ofertas)) return json.ofertas;
+        if (Array.isArray(json.despesas)) return json.despesas;
+        if (Array.isArray(json.dizimos)) return json.dizimos;
+        if (Array.isArray(json.membros)) return json.membros;
+        if (Array.isArray(json.membro)) return json.membro;
+        if (Array.isArray(json.items)) return json.items;
+        if (Array.isArray(json.results)) return json.results;
+        if (Array.isArray(json.content)) return json.content;
+        
+        // Single record object case
+        if (json.id != null || json.valor != null || json.nome != null) {
+          return [json];
+        }
+      }
+      return [];
+    } else {
+      console.error(`[API Status Error] ${url} respondeu com HTTP ${res.status}`);
     }
   } catch (e) {
-    console.warn(`Fetch falhou para ${url}:`, e);
+    console.warn(`[API Exception] Fetch falhou para ${url}:`, e);
     return null;
   } finally {
     clearTimeout(timeoutId);
@@ -152,11 +201,23 @@ async function safeFetchJson(url) {
  * Fetch all datasets safely from backend API
  */
 export async function fetchAllFinancialData() {
+  const token = getStoredToken();
+  if (!token) {
+    return {
+      status: 'unauthenticated',
+      membros: [],
+      dizimos: [],
+      ofertas: [],
+      despesas: [],
+      message: 'Sessão não autenticada ou expirada. Por favor, faça login novamente.'
+    };
+  }
+
   const baseUrl = getApiUrl();
 
   try {
     const [membrosData, dizimosData, ofertasData, despesasData] = await Promise.all([
-      safeFetchJson(`${baseUrl}/membros`),
+      safeFetchJson(`${baseUrl}/membro`),
       safeFetchJson(`${baseUrl}/dizimos`),
       safeFetchJson(`${baseUrl}/ofertas`),
       safeFetchJson(`${baseUrl}/despesas`)
@@ -225,77 +286,111 @@ export async function fetchAllFinancialData() {
 }
 
 /**
- * Generic helper to create a record via POST
+ * Shared mutation runner handling primary & fallback URLs, singular/plural endpoints, and errors
  */
-export async function createRecord(endpoint, payload) {
+async function executeMutation(endpoint, method, id = null, payload = null) {
   const baseUrl = getApiUrl();
+  const fallbackUrl = getFallbackApiUrl(baseUrl);
   const token = getStoredToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
+  const targetEp = normalizeEndpoint(endpoint);
+  const buildPath = (ep) => id != null ? `${ep}/${id}` : `${ep}`;
+
+  const opts = {
+    method,
+    headers,
+    ...(payload != null ? { body: JSON.stringify(payload) } : {})
+  };
+
+  let primaryUrl = `${baseUrl}/${buildPath(targetEp)}`;
+  let res = null;
+
   try {
-    const res = await fetch(`${baseUrl}/${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      const data = await res.json().catch(() => payload);
-      return { success: true, data };
+    res = await fetch(primaryUrl, opts);
+  } catch (primaryErr) {
+    console.warn(`[Mutation Fetch Primary Error] ${method} ${primaryUrl} falhou:`, primaryErr);
+    if (fallbackUrl && fallbackUrl !== baseUrl) {
+      const fallbackFullUrl = `${fallbackUrl}/${buildPath(targetEp)}`;
+      try {
+        console.info(`[Mutation Fallback] Tentando ${method} ${fallbackFullUrl}`);
+        res = await fetch(fallbackFullUrl, opts);
+      } catch (fallbackErr) {
+        console.error(`[Mutation Fallback Error] ${fallbackFullUrl} falhou:`, fallbackErr);
+        return { success: false, message: 'Servidor offline ou sem conexão.' };
+      }
+    } else {
+      return { success: false, message: 'Servidor offline ou sem conexão.' };
     }
-    const err = await res.json().catch(() => null);
-    return { success: false, message: err?.detail || err?.message || `Erro ${res.status} ao criar registro.` };
-  } catch (e) {
-    return { success: false, message: 'Servidor offline ou sem conexão.' };
   }
+
+  // Singular / Plural 404 Endpoint Fallback
+  if (res && res.status === 404) {
+    console.warn(`[Mutation 404] ${method} ${primaryUrl} - tentando variação de endpoint...`);
+    let altEp = null;
+    if (targetEp === 'dizimos') altEp = 'dizimo';
+    else if (targetEp === 'dizimo') altEp = 'dizimos';
+    else if (targetEp === 'ofertas') altEp = 'oferta';
+    else if (targetEp === 'oferta') altEp = 'ofertas';
+    else if (targetEp === 'despesas') altEp = 'despesa';
+    else if (targetEp === 'despesa') altEp = 'despesas';
+    else if (targetEp === 'membro') altEp = 'membros';
+    else if (targetEp === 'membros') altEp = 'membro';
+
+    if (altEp) {
+      const currentBase = res.url ? new URL(res.url).origin : baseUrl;
+      const altUrl = `${currentBase}/${buildPath(altEp)}`;
+      console.info(`[Mutation 404 Fallback] Tentando ${method} ${altUrl}`);
+      const altRes = await fetch(altUrl, opts).catch(() => null);
+      if (altRes && (altRes.ok || altRes.status === 201 || altRes.status === 204)) {
+        res = altRes;
+      }
+    }
+  }
+
+  if (res.ok || res.status === 201 || res.status === 204) {
+    const data = await res.json().catch(() => payload);
+    console.log(`[Mutation Success] ${method} ${endpoint}:`, data);
+    return { success: true, status: res.status, data };
+  }
+
+  if (res.status === 409) {
+    const err = await res.json().catch(() => null);
+    return {
+      success: false,
+      conflict: true,
+      status: 409,
+      message: err?.detail || err?.message || 'Não é possível realizar a operação devido a vínculo de dados.'
+    };
+  }
+
+  const err = await res.json().catch(() => null);
+  const detailMsg = typeof err?.detail === 'string' 
+    ? err.detail 
+    : err?.message || `Erro HTTP ${res.status} ao realizar ${method}.`;
+
+  console.error(`[Mutation HTTP ${res.status}] ${method} ${endpoint}:`, detailMsg);
+  return { success: false, status: res.status, message: detailMsg };
+}
+
+/**
+ * Generic helper to create a record via POST
+ */
+export async function createRecord(endpoint, payload) {
+  return executeMutation(endpoint, 'POST', null, payload);
 }
 
 /**
  * Generic helper to update a record via PUT
  */
 export async function updateRecord(endpoint, id, payload) {
-  const baseUrl = getApiUrl();
-  const token = getStoredToken();
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(`${baseUrl}/${endpoint}/${id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      const data = await res.json().catch(() => payload);
-      return { success: true, data };
-    }
-    const err = await res.json().catch(() => null);
-    return { success: false, message: err?.detail || err?.message || `Erro ${res.status} ao atualizar registro.` };
-  } catch (e) {
-    return { success: false, message: 'Servidor offline ou sem conexão.' };
-  }
+  return executeMutation(endpoint, 'PUT', id, payload);
 }
 
 /**
  * Generic helper to delete a record via DELETE
  */
 export async function deleteRecord(endpoint, id) {
-  const baseUrl = getApiUrl();
-  const token = getStoredToken();
-  const headers = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(`${baseUrl}/${endpoint}/${id}`, {
-      method: 'DELETE',
-      headers
-    });
-    if (res.ok) {
-      return { success: true };
-    }
-    const err = await res.json().catch(() => null);
-    return { success: false, message: err?.detail || err?.message || `Erro ${res.status} ao excluir registro.` };
-  } catch (e) {
-    return { success: false, message: 'Servidor offline ou sem conexão.' };
-  }
+  return executeMutation(endpoint, 'DELETE', id, null);
 }

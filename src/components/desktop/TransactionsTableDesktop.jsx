@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { HeartHandshake, Gift, CreditCard, Search, User, Calendar, Tag, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
-import { formatCurrency, formatDateBR, categorizeExpense } from '../../services/utils';
+import { formatCurrency, formatDateBR, categorizeExpense, getRecordValue, getRecordDate } from '../../services/utils';
 
 const PAGE_SIZE = 12;
 
@@ -30,7 +30,7 @@ export default function TransactionsTableDesktop({
       if (!item) return false;
       const memberObj = safeMembrosMap[item.membro_id];
       const memberName = typeof memberObj === 'object' ? (memberObj.nome || '') : String(memberObj || `Membro ID: ${item.membro_id}`);
-      const dateFormatted = formatDateBR(item.data);
+      const dateFormatted = formatDateBR(getRecordDate(item));
       return memberName.toLowerCase().includes(search) || dateFormatted.includes(search);
     });
   }, [safeDizimos, safeMembrosMap, search]);
@@ -38,26 +38,27 @@ export default function TransactionsTableDesktop({
   const filteredOfertas = React.useMemo(() => {
     return safeOfertas.filter(item => {
       if (!item) return false;
-      const dateFormatted = formatDateBR(item.data);
-      const valStr = item.valor != null ? String(item.valor) : '';
-      return dateFormatted.includes(search) || valStr.includes(search);
+      const dateFormatted = formatDateBR(getRecordDate(item));
+      const valStr = String(getRecordValue(item));
+      const desc = item.culto || item.tipo || item.descricao || 'Oferta';
+      return dateFormatted.includes(search) || valStr.includes(search) || desc.toLowerCase().includes(search);
     });
   }, [safeOfertas, search]);
 
   const filteredDespesas = React.useMemo(() => {
     return safeDespesas.filter(item => {
       if (!item) return false;
-      const desc = item.nome || '';
-      const dateFormatted = formatDateBR(item.data);
+      const desc = item.nome || item.descricao || '';
+      const dateFormatted = formatDateBR(getRecordDate(item));
       const category = categorizeExpense(desc);
       return desc.toLowerCase().includes(search) || category.toLowerCase().includes(search) || dateFormatted.includes(search);
     });
   }, [safeDespesas, search]);
 
   // Totals calculations
-  const totalDizimosVal = React.useMemo(() => filteredDizimos.reduce((acc, i) => acc + (Number(i?.valor) || 0), 0), [filteredDizimos]);
-  const totalOfertasVal = React.useMemo(() => filteredOfertas.reduce((acc, i) => acc + (Number(i?.valor) || 0), 0), [filteredOfertas]);
-  const totalDespesasVal = React.useMemo(() => filteredDespesas.reduce((acc, i) => acc + (Number(i?.valor) || 0), 0), [filteredDespesas]);
+  const totalDizimosVal = React.useMemo(() => filteredDizimos.reduce((acc, i) => acc + getRecordValue(i), 0), [filteredDizimos]);
+  const totalOfertasVal = React.useMemo(() => filteredOfertas.reduce((acc, i) => acc + getRecordValue(i), 0), [filteredOfertas]);
+  const totalDespesasVal = React.useMemo(() => filteredDespesas.reduce((acc, i) => acc + getRecordValue(i), 0), [filteredDespesas]);
 
   const showAll = viewMode === 'month' || isExporting;
   const isYearMode = viewMode === 'year';

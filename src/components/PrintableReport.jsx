@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatCurrency, formatDateBR, MONTHS } from '../services/utils';
+import { formatCurrency, formatDateBR, MONTHS, getRecordValue, getRecordDate } from '../services/utils';
 
 export default function PrintableReport({ 
   selectedYear = 2026, 
@@ -16,10 +16,10 @@ export default function PrintableReport({
 
   const monthName = MONTHS.find(m => m.value === selectedMonth)?.label || '';
   
-  const totalDizimos = safeDizimos.reduce((acc, i) => acc + (Number(i?.valor) || 0), 0);
-  const totalOfertas = safeOfertas.reduce((acc, i) => acc + (Number(i?.valor) || 0), 0);
+  const totalDizimos = safeDizimos.reduce((acc, i) => acc + getRecordValue(i), 0);
+  const totalOfertas = safeOfertas.reduce((acc, i) => acc + getRecordValue(i), 0);
   const totalEntradas = totalDizimos + totalOfertas;
-  const totalDespesas = safeDespesas.reduce((acc, i) => acc + (Number(i?.valor) || 0), 0);
+  const totalDespesas = safeDespesas.reduce((acc, i) => acc + getRecordValue(i), 0);
   const saldoFinal = totalEntradas - totalDespesas;
 
   return (

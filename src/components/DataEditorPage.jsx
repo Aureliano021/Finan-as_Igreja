@@ -109,9 +109,9 @@ export default function DataEditorPage() {
     } else if (activeTab === 'dizimos') {
       setFormData({ membro_id: membros[0]?.id || '', valor: '', data: today });
     } else if (activeTab === 'ofertas') {
-      setFormData({ culto: 'Culto de Domingo', valor: '', data: today });
+      setFormData({ valor: '', data: today });
     } else if (activeTab === 'despesas') {
-      setFormData({ tipo_despesa: 'Água', descricao: 'Água', valor: '', data: today });
+      setFormData({ nome: '', valor: '', data: today });
     }
     setIsModalOpen(true);
   };
@@ -130,18 +130,15 @@ export default function DataEditorPage() {
       });
     } else if (activeTab === 'dizimos') {
       const dateVal = item.data ? String(item.data).split('T')[0] : '';
-      setFormData({ membro_id: item.membro_id || '', valor: item.valor || '', data: dateVal });
+      setFormData({ membro_id: item.membro_id || '', valor: item.valor != null ? String(item.valor) : '', data: dateVal });
     } else if (activeTab === 'ofertas') {
       const dateVal = item.data ? String(item.data).split('T')[0] : '';
-      setFormData({ culto: item.culto || item.tipo || 'Culto Geral', valor: item.valor || '', data: dateVal });
+      setFormData({ valor: item.valor != null ? String(item.valor) : '', data: dateVal });
     } else if (activeTab === 'despesas') {
       const dateVal = item.data ? String(item.data).split('T')[0] : '';
-      const descName = item.descricao || item.nome || '';
-      const isPreset = ['Água', 'Luz', 'Internet'].includes(descName);
       setFormData({
-        tipo_despesa: isPreset ? descName : 'Outros',
-        descricao: descName,
-        valor: item.valor || '',
+        nome: item.nome || item.descricao || '',
+        valor: item.valor != null ? String(item.valor) : '',
         data: dateVal
       });
     }
@@ -154,14 +151,108 @@ export default function DataEditorPage() {
     setIsSubmitting(true);
 
     const isEdit = !!editingItem;
-    const endpointMap = { membros: 'membros', dizimos: 'dizimos', ofertas: 'ofertas', despesas: 'despesas' };
+    const endpointMap = { membros: 'membro', dizimos: 'dizimos', ofertas: 'ofertas', despesas: 'despesas' };
     const endpoint = endpointMap[activeTab];
+
+    let payload = {};
+
+    if (activeTab === 'membros') {
+      if (isEdit) {
+        // Compute partial payload (only changed fields) for PUT /membro/{id}
+        const initialDob = editingItem.data_nascimento ? String(editingItem.data_nascimento).split('T')[0] : '';
+        const initialMembro = Boolean(editingItem.membro);
+        const initialBatizado = Boolean(editingItem.batizado);
+        const initialUniaoEstavel = Boolean(editingItem.uniao_estavel ?? editingItem.dizimista);
+
+        payload = {};
+        if (formData.nome !== (editingItem.nome || '')) {
+          payload.nome = String(formData.nome || '').trim();
+        }
+        if ((formData.data_nascimento || '') !== initialDob) {
+          payload.data_nascimento = formData.data_nascimento || null;
+        }
+        if (Boolean(formData.membro) !== initialMembro) {
+          payload.membro = Boolean(formData.membro);
+        }
+        if (Boolean(formData.batizado) !== initialBatizado) {
+          payload.batizado = Boolean(formData.batizado);
+        }
+        if (Boolean(formData.uniao_estavel) !== initialUniaoEstavel) {
+          payload.uniao_estavel = Boolean(formData.uniao_estavel);
+        }
+      } else {
+        // Enforce mandatory payload structure for POST /membro
+        payload = {
+          nome: String(formData.nome || '').trim(),
+          data_nascimento: formData.data_nascimento || null,
+          membro: Boolean(formData.membro),
+          batizado: Boolean(formData.batizado),
+          uniao_estavel: Boolean(formData.uniao_estavel)
+        };
+      }
+    } else if (activeTab === 'despesas') {
+      // Mandatory fields for POST /despesas and PUT /despesas/{id}: nome, data, valor
+      payload = {
+        nome: String(formData.nome || '').trim(),
+        data: formData.data,
+        valor: Number(formData.valor)
+      };
+    } else if (activeTab === 'ofertas') {
+      // Mandatory fields for POST /ofertas and PUT /ofertas/{id}: valor, data
+      payload = {
+        valor: Number(formData.valor),
+        data: formData.data
+      };
+    } else if (activeTab === 'dizimos') {
+      const membId = Number(formData.membro_id);
+      const val = Number(formData.valor);
+      if (!isEdit && (!membId || isNaN(membId))) {
+        setIsSubmitting(false);
+        showToast('Por favor, selecione um membro cadastrado da lista.', 'error');
+        return;
+      }
+      if (isNaN(val) || val <= 0) {
+        setIsSubmitting(false);
+        showToast('Por favor, informe um valor numérico válido.', 'error');
+        return;
+      }
+      if (!formData.data) {
+        setIsSubmitting(false);
+        showToast('Por favor, informe a data do dízimo.', 'error');
+        return;
+      }
+
+      if (isEdit) {
+        // PUT /dizimos/{id} is partial (optional fields: membro_id, valor, data)
+        const initialDate = editingItem.data ? String(editingItem.data).split('T')[0] : '';
+        const initialMembroId = Number(editingItem.membro_id);
+        const initialValor = Number(editingItem.valor);
+
+        payload = {};
+        if (membId && membId !== initialMembroId) {
+          payload.membro_id = membId;
+        }
+        if (val !== initialValor) {
+          payload.valor = val;
+        }
+        if ((formData.data || '') !== initialDate) {
+          payload.data = formData.data;
+        }
+      } else {
+        // POST /dizimos requires: membro_id, valor, data
+        payload = {
+          membro_id: membId,
+          valor: val,
+          data: formData.data
+        };
+      }
+    }
 
     let result;
     if (isEdit) {
-      result = await updateRecord(endpoint, editingItem.id, formData);
+      result = await updateRecord(endpoint, editingItem.id, payload);
     } else {
-      result = await createRecord(endpoint, formData);
+      result = await createRecord(endpoint, payload);
     }
 
     setIsSubmitting(false);
@@ -171,22 +262,26 @@ export default function DataEditorPage() {
       setIsModalOpen(false);
       loadData(); // Refresh list
     } else {
-      // Offline fallback: Update local state immediately for seamless demonstration
-      const newId = isEdit ? editingItem.id : Date.now();
-      const updatedRecord = { id: newId, ...formData };
-      
-      if (activeTab === 'membros') {
-        setMembros(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
-      } else if (activeTab === 'dizimos') {
-        setDizimos(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
-      } else if (activeTab === 'ofertas') {
-        setOfertas(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
-      } else if (activeTab === 'despesas') {
-        setDespesas(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
-      }
+      // Offline fallback / error message display
+      if (result.message && connectionStatus.status === 'online') {
+        showToast(result.message, 'error');
+      } else {
+        const newId = isEdit ? editingItem.id : Date.now();
+        const updatedRecord = { id: newId, ...(isEdit ? { ...editingItem, ...payload } : payload) };
+        
+        if (activeTab === 'membros') {
+          setMembros(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
+        } else if (activeTab === 'dizimos') {
+          setDizimos(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
+        } else if (activeTab === 'ofertas') {
+          setOfertas(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
+        } else if (activeTab === 'despesas') {
+          setDespesas(prev => isEdit ? prev.map(i => i.id === newId ? updatedRecord : i) : [updatedRecord, ...prev]);
+        }
 
-      showToast(isEdit ? 'Registro atualizado localmente (Modo Demonstrativo).' : 'Registro cadastrado localmente (Modo Demonstrativo).', 'success');
-      setIsModalOpen(false);
+        showToast(isEdit ? 'Registro atualizado localmente (Modo Demonstrativo).' : 'Registro cadastrado localmente (Modo Demonstrativo).', 'success');
+        setIsModalOpen(false);
+      }
     }
   };
 
@@ -195,25 +290,31 @@ export default function DataEditorPage() {
     if (!deletingItem) return;
     setIsDeleting(true);
 
-    const endpointMap = { membros: 'membros', dizimos: 'dizimos', ofertas: 'ofertas', despesas: 'despesas' };
+    const endpointMap = { membros: 'membro', dizimos: 'dizimos', ofertas: 'ofertas', despesas: 'despesas' };
     const endpoint = endpointMap[activeTab];
 
     const result = await deleteRecord(endpoint, deletingItem.id);
     setIsDeleting(false);
 
-    // Update local state in both online or offline fallback modes
-    if (activeTab === 'membros') {
-      setMembros(prev => prev.filter(i => i.id !== deletingItem.id));
-    } else if (activeTab === 'dizimos') {
-      setDizimos(prev => prev.filter(i => i.id !== deletingItem.id));
-    } else if (activeTab === 'ofertas') {
-      setOfertas(prev => prev.filter(i => i.id !== deletingItem.id));
-    } else if (activeTab === 'despesas') {
-      setDespesas(prev => prev.filter(i => i.id !== deletingItem.id));
+    if (result.success) {
+      if (activeTab === 'membros') {
+        setMembros(prev => prev.filter(i => i.id !== deletingItem.id));
+      } else if (activeTab === 'dizimos') {
+        setDizimos(prev => prev.filter(i => i.id !== deletingItem.id));
+      } else if (activeTab === 'ofertas') {
+        setOfertas(prev => prev.filter(i => i.id !== deletingItem.id));
+      } else if (activeTab === 'despesas') {
+        setDespesas(prev => prev.filter(i => i.id !== deletingItem.id));
+      }
+      showToast('Registro removido com sucesso!');
+      setDeletingItem(null);
+    } else if (result.conflict || result.status === 409) {
+      showToast(result.message || 'Não é possível excluir um membro com registros vinculados.', 'error');
+      setDeletingItem(null);
+    } else {
+      showToast(result.message || 'Erro ao excluir registro.', 'error');
+      setDeletingItem(null);
     }
-
-    showToast('Registro removido com sucesso!');
-    setDeletingItem(null);
   };
 
   // Filtering list by search term
@@ -228,9 +329,9 @@ export default function DataEditorPage() {
         return name.toLowerCase().includes(search) || formatDateBR(d.data).includes(search);
       });
     } else if (activeTab === 'ofertas') {
-      return ofertas.filter(o => (o?.culto || o?.tipo || '').toLowerCase().includes(search) || formatDateBR(o.data).includes(search));
+      return ofertas.filter(o => formatDateBR(o.data).includes(search) || String(o.valor || '').includes(search));
     } else if (activeTab === 'despesas') {
-      return despesas.filter(d => (d?.descricao || d?.nome || '').toLowerCase().includes(search) || formatDateBR(d.data).includes(search));
+      return despesas.filter(d => (d?.nome || d?.descricao || '').toLowerCase().includes(search) || formatDateBR(d.data).includes(search));
     }
     return [];
   }, [activeTab, membros, dizimos, ofertas, despesas, membrosMap, search]);
@@ -260,7 +361,57 @@ export default function DataEditorPage() {
       {/* Main Content */}
       <main style={{ flex: 1, maxWidth: '1320px', width: '100%', margin: '0 auto', padding: '24px 16px' }}>
         
-        {/* Page Banner */}
+        {connectionStatus.status === 'unauthenticated' ? (
+          <div style={{
+            maxWidth: '540px',
+            margin: '40px auto',
+            padding: '32px',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '24px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.08)',
+            textAlign: 'center'
+          }} role="alert">
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto'
+            }}>
+              🔒
+            </div>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 8px 0' }}>
+              Autenticação Necessária
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>
+              {connectionStatus.message || 'Sessão expirada ou não autenticada. Por favor, faça login novamente.'}
+            </p>
+            <a
+              href="/login.html"
+              style={{
+                display: 'inline-block',
+                padding: '12px 24px',
+                borderRadius: '9999px',
+                background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                color: '#ffffff',
+                fontWeight: 800,
+                fontSize: '0.875rem',
+                textDecoration: 'none',
+                boxShadow: '0 4px 14px rgba(21, 101, 192, 0.3)'
+              }}
+            >
+              Fazer Login / Criar Conta
+            </a>
+          </div>
+        ) : (
+          <>
+            {/* Page Banner */}
         <div className="glass-card" style={{ padding: '24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-primary)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -383,6 +534,7 @@ export default function DataEditorPage() {
                       )}
                       {activeTab === 'dizimos' && (
                         <>
+                          <th style={{ padding: '12px' }}>ID</th>
                           <th style={{ padding: '12px' }}>Membro Dizimista</th>
                           <th style={{ padding: '12px' }}>Data</th>
                           <th style={{ padding: '12px' }}>Valor</th>
@@ -391,7 +543,7 @@ export default function DataEditorPage() {
                       )}
                       {activeTab === 'ofertas' && (
                         <>
-                          <th style={{ padding: '12px' }}>Culto / Origem</th>
+                          <th style={{ padding: '12px' }}>ID</th>
                           <th style={{ padding: '12px' }}>Data</th>
                           <th style={{ padding: '12px' }}>Valor</th>
                           <th style={{ padding: '12px', textAlign: 'right' }}>Ações</th>
@@ -399,7 +551,8 @@ export default function DataEditorPage() {
                       )}
                       {activeTab === 'despesas' && (
                         <>
-                          <th style={{ padding: '12px' }}>Descrição da Despesa</th>
+                          <th style={{ padding: '12px' }}>ID</th>
+                          <th style={{ padding: '12px' }}>Nome da Despesa</th>
                           <th style={{ padding: '12px' }}>Data</th>
                           <th style={{ padding: '12px' }}>Valor</th>
                           <th style={{ padding: '12px', textAlign: 'right' }}>Ações</th>
@@ -422,21 +575,21 @@ export default function DataEditorPage() {
                                   background: item.membro ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
                                   color: item.membro ? '#10b981' : '#64748b'
                                 }}>
-                                  {item.membro ? '✓ Membro' : '✕ Não Membro'}
+                                  {item.membro ? '✓ Membro' : '✕ Membro'}
                                 </span>
                                 <span style={{
                                   padding: '3px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
                                   background: item.batizado ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.15)',
                                   color: item.batizado ? '#3b82f6' : '#64748b'
                                 }}>
-                                  {item.batizado ? '✓ Batizado' : '✕ Não Batizado'}
+                                  {item.batizado ? '✓ Batizado' : '✕ Batizado'}
                                 </span>
                                 <span style={{
                                   padding: '3px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
                                   background: (item.uniao_estavel ?? item.dizimista) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(148, 163, 184, 0.15)',
                                   color: (item.uniao_estavel ?? item.dizimista) ? '#8b5cf6' : '#64748b'
                                 }}>
-                                  {(item.uniao_estavel ?? item.dizimista) ? '✓ União Estável' : '✕ Solteiro(a)'}
+                                  {(item.uniao_estavel ?? item.dizimista) ? '✓ União Estável' : '✕ União Estável'}
                                 </span>
                               </div>
                             </td>
@@ -445,6 +598,7 @@ export default function DataEditorPage() {
 
                         {activeTab === 'dizimos' && (
                           <>
+                            <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-muted)' }}>#{item.id}</td>
                             <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                               {membrosMap[item.membro_id]?.nome || `Membro ID: ${item.membro_id}`}
                             </td>
@@ -455,7 +609,7 @@ export default function DataEditorPage() {
 
                         {activeTab === 'ofertas' && (
                           <>
-                            <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{item.culto || item.tipo || 'Culto Geral'}</td>
+                            <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-muted)' }}>#{item.id}</td>
                             <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{formatDateBR(item.data)}</td>
                             <td style={{ padding: '12px', fontWeight: 800, color: '#3b82f6' }}>{formatCurrency(item.valor)}</td>
                           </>
@@ -463,7 +617,8 @@ export default function DataEditorPage() {
 
                         {activeTab === 'despesas' && (
                           <>
-                            <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{item.descricao || item.nome}</td>
+                            <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-muted)' }}>#{item.id}</td>
+                            <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{item.nome || item.descricao}</td>
                             <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{formatDateBR(item.data)}</td>
                             <td style={{ padding: '12px', fontWeight: 800, color: '#ef4444' }}>{formatCurrency(item.valor)}</td>
                           </>
@@ -498,6 +653,8 @@ export default function DataEditorPage() {
             )}
           </div>
         </ViewTransition>
+          </>
+        )}
 
       </main>
 
@@ -647,87 +804,61 @@ export default function DataEditorPage() {
                 </>
               )}
 
-              {/* OFERTAS FIELDS */}
+              {/* OFERTAS FIELDS (API payload: valor, data) */}
               {activeTab === 'ofertas' && (
-                <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Culto / Origem *</label>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Valor (R$) *</label>
                     <input
-                      type="text"
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="Ex: 150.75"
+                      className="text-input"
+                      style={{ width: '100%', color: '#0f172a' }}
+                      value={formData.valor || ''}
+                      onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Data *</label>
+                    <input
+                      type="date"
                       required
                       className="text-input"
                       style={{ width: '100%', color: '#0f172a' }}
-                      value={formData.culto || ''}
-                      onChange={(e) => setFormData({ ...formData, culto: e.target.value })}
+                      value={formData.data || ''}
+                      onChange={(e) => setFormData({ ...formData, data: e.target.value })}
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Valor (R$) *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        className="text-input"
-                        style={{ width: '100%', color: '#0f172a' }}
-                        value={formData.valor || ''}
-                        onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Data *</label>
-                      <input
-                        type="date"
-                        required
-                        className="text-input"
-                        style={{ width: '100%', color: '#0f172a' }}
-                        value={formData.data || ''}
-                        onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
 
-              {/* DESPESAS FIELDS (Preset: Água, Luz, Internet, Outros) */}
+              {/* DESPESAS FIELDS (API payload: nome, data, valor) */}
               {activeTab === 'despesas' && (
                 <>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Tipo de Despesa *</label>
-                    <select
-                      className="select-input"
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Nome da Despesa *</label>
+                    <input
+                      type="text"
+                      required
+                      list="despesas-suggestions"
+                      placeholder="Ex: Conta de energia"
+                      className="text-input"
                       style={{ width: '100%', color: '#0f172a' }}
-                      value={formData.tipo_despesa || 'Água'}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFormData({
-                          ...formData,
-                          tipo_despesa: val,
-                          descricao: val !== 'Outros' ? val : (formData.descricaoCustom || '')
-                        });
-                      }}
-                    >
-                      <option value="Água">Água</option>
-                      <option value="Luz">Luz</option>
-                      <option value="Internet">Internet</option>
-                      <option value="Outros">Outros…</option>
-                    </select>
+                      value={formData.nome || ''}
+                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    />
+                    <datalist id="despesas-suggestions">
+                      <option value="Conta de energia" />
+                      <option value="Conta de água" />
+                      <option value="Internet e Telefone" />
+                      <option value="Aluguel do Imóvel" />
+                      <option value="Manutenção de Equipamentos" />
+                      <option value="Material de Escritório" />
+                      <option value="Ceia e Alimentos" />
+                    </datalist>
                   </div>
-
-                  {formData.tipo_despesa === 'Outros' && (
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px' }}>Descrição Personalizada *</label>
-                      <input
-                        type="text"
-                        required
-                        className="text-input"
-                        placeholder="Ex: Manutenção de Equipamentos"
-                        style={{ width: '100%', color: '#0f172a' }}
-                        value={formData.descricaoCustom || (['Água', 'Luz', 'Internet'].includes(formData.descricao) ? '' : formData.descricao) || ''}
-                        onChange={(e) => setFormData({ ...formData, descricaoCustom: e.target.value, descricao: e.target.value })}
-                      />
-                    </div>
-                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
@@ -736,6 +867,7 @@ export default function DataEditorPage() {
                         type="number"
                         step="0.01"
                         required
+                        placeholder="Ex: 250.00"
                         className="text-input"
                         style={{ width: '100%', color: '#0f172a' }}
                         value={formData.valor || ''}

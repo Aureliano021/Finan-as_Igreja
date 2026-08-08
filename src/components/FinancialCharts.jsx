@@ -1,6 +1,6 @@
 import React from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
-import { formatCurrency, categorizeExpense } from '../services/utils';
+import { formatCurrency, categorizeExpense, getRecordValue } from '../services/utils';
 import { BarChart3, PieChart as PieIcon } from 'lucide-react';
 
 // Semantically distinct color palette for expense categories
@@ -43,8 +43,8 @@ export default function FinancialCharts({ dizimosMonth = [], ofertasMonth = [], 
     const expenseCategoriesMap = {};
     safeDespesas.forEach(item => {
       if (!item) return;
-      const category = categorizeExpense(item.nome);
-      const val = Number(item.valor) || 0;
+      const category = categorizeExpense(item.nome || item.descricao);
+      const val = getRecordValue(item);
       expenseCategoriesMap[category] = (expenseCategoriesMap[category] || 0) + val;
     });
 

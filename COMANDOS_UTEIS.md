@@ -53,7 +53,7 @@ Este guia contém os principais comandos para gerenciar o ambiente Termux, o sis
 
 * **Conectar no Termux (Porta 8022):**
   ```powershell
-  ssh u0_a153@192.168.1.83 -p 8022
+  ssh u0_a153@192.168.1.83 -p 8022 ou 2222 ambos (termux debian) senha 010487
   ```
 * **Conectar no Debian Direto como Root (Porta 22):**
   ```powershell
@@ -70,7 +70,9 @@ Este guia contém os principais comandos para gerenciar o ambiente Termux, o sis
 
 ---
 
-## 4. 🚀 Executar a Aplicação Web (React + Vite)
+## 4. 🚀 Executar a Aplicação Web (React + Vite) ****defasado
+
+correção; isso foi uma solução ao docker que não funcioava... estou tentando corrgir mas até o momento ainda não está funcioando. o gerenciamento de arquivos está por meio do git pull, algo assim.
 
 Dentro do Debian (pasta do projeto):
 
@@ -118,6 +120,31 @@ npm run dev
 * **No Termux sem Root (versão leve):**
   ```bash
   htop
+  ```
+
+---
+
+## 7. 🐳 Docker & Docker Compose no Android
+
+* **Iniciar o Docker Daemon (`dockerd`):**
+  ```bash
+  dockerd &
+  ```
+* **Subir a aplicação em container via Docker Compose (porta 80):**
+  ```bash
+  docker compose up -d --build
+  ```
+* **Verificar containers em execução:**
+  ```bash
+  docker ps
+  ```
+* **Verificar logs do container:**
+  ```bash
+  docker logs igreja_financas_app
+  ```
+* **Parar os containers:**
+  ```bash
+  docker compose down
   ```
 
 ---

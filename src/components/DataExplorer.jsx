@@ -257,18 +257,18 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                       {m.batizado ? <Check size={10} /> : <X size={10} />} Batizado
                     </span>
 
-                    {/* Boolean 3: Dizimista / União Estável */}
+                    {/* Boolean 3: União Estável */}
                     <span className="badge" style={{
                       flex: 1,
                       justifyContent: 'center',
-                      background: (m.dizimista ?? m.uniao_estavel) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
-                      color: (m.dizimista ?? m.uniao_estavel) ? '#c084fc' : 'var(--text-muted)',
-                      border: `1px solid ${(m.dizimista ?? m.uniao_estavel) ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
+                      background: (m.uniao_estavel ?? m.dizimista) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+                      color: (m.uniao_estavel ?? m.dizimista) ? '#c084fc' : 'var(--text-muted)',
+                      border: `1px solid ${(m.uniao_estavel ?? m.dizimista) ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
                       fontSize: '0.62rem',
                       padding: '3px 4px',
                       whiteSpace: 'nowrap'
                     }}>
-                      {(m.dizimista ?? m.uniao_estavel) ? <Check size={10} /> : <X size={10} />} {m.dizimista !== undefined ? 'Dizimista' : 'União Est.'}
+                      {(m.uniao_estavel ?? m.dizimista) ? <Check size={10} /> : <X size={10} />} União Estável
                     </span>
                   </div>
                 </div>
@@ -332,13 +332,13 @@ export default function DataExplorer({ membros = [], dizimos = [], ofertas = [],
                           </span>
 
                           <span className="badge" style={{
-                            background: (m.dizimista ?? m.uniao_estavel) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
-                            color: (m.dizimista ?? m.uniao_estavel) ? '#c084fc' : 'var(--text-muted)',
-                            border: `1px solid ${(m.dizimista ?? m.uniao_estavel) ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
+                            background: (m.uniao_estavel ?? m.dizimista) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.05)',
+                            color: (m.uniao_estavel ?? m.dizimista) ? '#c084fc' : 'var(--text-muted)',
+                            border: `1px solid ${(m.uniao_estavel ?? m.dizimista) ? 'rgba(192,132,252,0.3)' : 'var(--border-color)'}`,
                             fontSize: '0.68rem',
                             whiteSpace: 'nowrap'
                           }}>
-                            {(m.dizimista ?? m.uniao_estavel) ? <Check size={10} /> : <X size={10} />} {m.dizimista !== undefined ? 'Dizimista' : 'União Est.'}
+                            {(m.uniao_estavel ?? m.dizimista) ? <Check size={10} /> : <X size={10} />} União Estável
                           </span>
                         </div>
                       </td>
