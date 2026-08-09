@@ -48,7 +48,7 @@ export function setApiUrl(url) {
 }
 
 function normalizeEndpoint(endpoint) {
-  if (endpoint === 'membro' || endpoint === 'membros') return 'membros';
+  if (endpoint === 'membros' || endpoint === 'membro') return 'membro';
   return endpoint;
 }
 
@@ -69,7 +69,7 @@ export async function checkApiHealth() {
 
     let res;
     try {
-      res = await fetch(`${baseUrl}/membros`, {
+      res = await fetch(`${baseUrl}/membro`, {
         method: 'GET',
         headers,
         signal: controller.signal
@@ -77,7 +77,7 @@ export async function checkApiHealth() {
     } catch (primaryErr) {
       const fallbackUrl = getFallbackApiUrl(baseUrl);
       if (fallbackUrl && fallbackUrl !== baseUrl) {
-        res = await fetch(`${fallbackUrl}/membros`, {
+        res = await fetch(`${fallbackUrl}/membro`, {
           method: 'GET',
           headers,
           signal: controller.signal
@@ -217,7 +217,7 @@ export async function fetchAllFinancialData() {
 
   try {
     const [membrosData, dizimosData, ofertasData, despesasData] = await Promise.all([
-      safeFetchJson(`${baseUrl}/membros`),
+      safeFetchJson(`${baseUrl}/membro`),
 
       safeFetchJson(`${baseUrl}/dizimos`),
       safeFetchJson(`${baseUrl}/ofertas`),
@@ -367,9 +367,14 @@ async function executeMutation(endpoint, method, id = null, payload = null) {
   }
 
   const err = await res.json().catch(() => null);
-  const detailMsg = typeof err?.detail === 'string' 
-    ? err.detail 
-    : err?.message || `Erro HTTP ${res.status} ao realizar ${method}.`;
+  let detailMsg = '';
+  if (typeof err?.detail === 'string') {
+    detailMsg = err.detail;
+  } else if (Array.isArray(err?.detail)) {
+    detailMsg = err.detail.map(d => `${Array.isArray(d.loc) ? d.loc.slice(-1)[0] : 'campo'}: ${d.msg}`).join('; ');
+  } else {
+    detailMsg = err?.message || `Erro HTTP ${res.status} ao realizar ${method}.`;
+  }
 
   console.error(`[Mutation HTTP ${res.status}] ${method} ${endpoint}:`, detailMsg);
   return { success: false, status: res.status, message: detailMsg };

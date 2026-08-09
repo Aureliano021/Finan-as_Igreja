@@ -147,24 +147,14 @@ CONFIG_MACVLAN=y                 CONFIG_IP_VS=y
 
 ```bash
 # === OBRIGATÓRIAS (Docker não funciona sem) ===
-CONFIG_POSIX_MQUEUE=y
-CONFIG_BRIDGE_NETFILTER=y
-CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-CONFIG_NETFILTER_XT_MATCH_IPVS=y
-CONFIG_IP6_NF_NAT=y
-CONFIG_IP6_NF_TARGET_MASQUERADE=y
+---
 
-# === OPCIONAIS RECOMENDADAS ===
-CONFIG_USER_NS=y
-CONFIG_BLK_DEV_THROTTLING=y
-CONFIG_CGROUP_NET_PRIO=y
-CONFIG_CFS_BANDWIDTH=y
-CONFIG_VXLAN=y
-CONFIG_MACVLAN=y
-CONFIG_IPVLAN=y
-```
+## 🟢 6. Kernel Compilado & Flags Ativas
 
-### ✅ Flags que JÁ ESTÃO OK (não mexer):
+> **Status:** **100% Concluído e Aprovado.**
+> O kernel foi compilado com todas as flags do Docker (namespaces, cgroups, overlay2, sysvipc e mqueue).
+
+### Checklist de flags ativas no Kernel:
 ```
 CONFIG_NAMESPACES=y       CONFIG_NET_NS=y          CONFIG_PID_NS=y
 CONFIG_IPC_NS=y           CONFIG_UTS_NS=y          CONFIG_CGROUPS=y
@@ -177,78 +167,68 @@ CONFIG_NETFILTER_XT_MARK=y CONFIG_IP_NF_RAW=y      CONFIG_IP_NF_NAT=y
 CONFIG_NF_NAT=y           CONFIG_IP6_NF_RAW=y      CONFIG_NF_NAT_IPV4=y
 CONFIG_NF_NAT_NEEDED=y    CONFIG_OVERLAY_FS=y       CONFIG_SECCOMP=y
 CONFIG_SECCOMP_FILTER=y   CONFIG_CGROUP_PIDS=y      CONFIG_SYSVIPC=y
-CONFIG_SYSVIPC_SYSCTL=y   CONFIG_EXT4_FS=y
-```
-
-
----
-
-## 🧪 7. Debug Realizado (08/08/2026) — Erros & Soluções
-
-### Sequência de erros encontrados e resolvidos:
-
-| # | Erro | Causa | Solução |
-|:--|:-----|:------|:--------|
-| 1 | `remount /, flags: 0x84000: invalid argument` | Driver `overlay2` sobre `f2fs` no chroot | Trocar para `"storage-driver": "vfs"` |
-| 2 | `open /proc/self/mountinfo: no such file or directory` | `/proc` não montado no chroot | `mount -t proc proc /proc` |
-| 3 | `failed to start containerd: timeout` | containerd não iniciou (sem `/proc`) | Montar `/proc`, `/sys`, `/dev` antes de iniciar |
-| 4 | `Devices cgroup isn't mounted` | Cgroups v1 não montados no chroot | Montar cada controlador em `/sys/fs/cgroup/` |
-| 5 | `cpuset.cpus: Permission denied` | SELinux do Android protege cpuset | Desmontar cpuset (`umount /sys/fs/cgroup/cpuset`) |
-| 6 | `/dev/shm is not mounted` | Shared memory não disponível | `mount -t tmpfs tmpfs /dev/shm` |
-| 7 | `mounting "mqueue": no such device` | **`CONFIG_POSIX_MQUEUE` não compilado no kernel** | ⏳ **Pendente: recompilar kernel** |
-
----
-
-## 🛠️ 8. Script Correto de Inicialização do Chroot + Docker
-
-> ⚠️ Este script deve ser executado **de fora do chroot** (Termux/ADB com root).
-> Futuramente será integrado ao `autostart_debian.sh` do Magisk.
-
-### Passo 1: Montar filesystems e entrar no chroot
-```bash
-# Executar como root (su) no Android/Termux
-CHROOT=/data/local/tmp/chrootDebian
-
-# Montar filesystems virtuais ("abrir as janelas" do chroot)
-mount -t proc proc $CHROOT/proc 2>/dev/null
-mount -t sysfs sysfs $CHROOT/sys 2>/dev/null
-mount -o bind /dev $CHROOT/dev 2>/dev/null
-mount -t devpts devpts $CHROOT/dev/pts 2>/dev/null
-mkdir -p $CHROOT/dev/shm
-mount -t tmpfs tmpfs $CHROOT/dev/shm 2>/dev/null
-
-# Entrar no chroot
-chroot $CHROOT /bin/bash
-```
-
-### Passo 2: Dentro do chroot — configurar cgroups e Docker
-```bash
-# Setar PATH
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-# Montar cgroups v1 (sem cpuset — bloqueado pelo SELinux)
-mkdir -p /sys/fs/cgroup
-mount -t tmpfs cgroup_root /sys/fs/cgroup 2>/dev/null
-for cg in devices cpu cpuacct blkio memory pids freezer; do
-  mkdir -p /sys/fs/cgroup/$cg
-  mount -t cgroup -o $cg cgroup /sys/fs/cgroup/$cg 2>/dev/null
-done
-
-# Configurar Docker com driver VFS
-echo '{"storage-driver": "vfs", "iptables": false}' > /etc/docker/daemon.json
-
-# Iniciar containerd + dockerd
-containerd > /tmp/containerd.log 2>&1 &
-sleep 3
-dockerd > /tmp/dockerd.log 2>&1 &
-sleep 5
-
-# Testar (com --ipc=host até recompilar kernel com MQUEUE)
-docker run --rm --ipc=host hello-world
+CONFIG_SYSVIPC_SYSCTL=y   CONFIG_POSIX_MQUEUE=y    CONFIG_POSIX_MQUEUE_SYSCTL=y
 ```
 
 ---
 
-## 📂 9. Arquivos de Backup no PC
-- **[magisk_patched-30700_MjQU1.img](file:///C:/Users/aurel/Downloads/magisk_patched-30700_MjQU1.img)** (`64.0 MB`) — Imagem atualmente rodando no celular.
-- **[NOVO_KERNEL_DOCKER.img](file:///C:/Users/aurel/Downloads/NOVO_KERNEL_DOCKER.img)** (`64.0 MB`) — Imagem base do Kernel nova.
+## 🏛️ 7. Arquitetura Final do Servidor no Celular (Redmi Note 8)
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Xiaomi Redmi Note 8 (ginkgo)                          │
+│                Kernel Linux 4.14 Customizado (Magisk Root)                  │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                        Debian Linux (chroot)                          │  │
+│  │                                                                       │  │
+│  │   Docker Daemon (vfs storage, iptables: false)                        │  │
+│  │   docker-compose.yml em /root/docker/                                 │  │
+│  │                                                                       │  │
+│  │   ┌───────────────────┐ ┌───────────────────┐ ┌────────────────────┐   │  │
+│  │   │  igreja_frontend  │ │  igreja_backend   │ │  igreja_postgres   │   │  │
+│  │   │   (Nginx + React) │ │     (FastAPI)     │ │   (PostgreSQL 16)  │   │  │
+│  │   │     Porta 80      │ │    Porta 8000     │ │     Porta 5432     │   │  │
+│  │   └─────────┬─────────┘ └─────────┬─────────┘ └─────────┬──────────┘   │  │
+│  └─────────────┼─────────────────────┼─────────────────────┼──────────────┘  │
+│                │ (network_mode: host)│                     │                 │
+└────────────────┼─────────────────────┼─────────────────────┼─────────────────┘
+                 ▼                     ▼                     ▼
+          http://IP:80           http://IP:8000/docs   127.0.0.1:5432
+          Web App React          Swagger API           7 Tabelas (bi_learning)
+```
+
+---
+
+## 🛠️ 8. Automação de Boot via Magisk (`autostart_debian.sh`)
+
+O celular reinicia e sobe **todos os serviços sozinho** via script no Magisk:
+
+- **Script Host Magisk:** `/data/adb/service.d/autostart_debian.sh`
+- **Script Interno Debian:** `/root/start_services.sh`
+- **Log de Boot:** `/data/local/tmp/autostart.log`
+
+### O que o script de boot faz em sequência:
+1. Aguarda 10 segundos para a rede e a interface Wi-Fi estabilizarem.
+2. Aplica `mount -o bind` e `mount --make-rshared` na raiz do chroot no Android host.
+3. Monta os sistemas de arquivos virtuais (`/proc`, `/sys`, `/dev`, `/dev/pts`, `/dev/shm`).
+4. Inicia o servidor **SSH** na porta 22.
+5. Aplica `mount --make-rslave /` dentro do Debian e monta a hierarquia de **Cgroups v1** em `/sys/fs/cgroup/`.
+6. Configura o wrapper transparente do `/usr/bin/runc` com `--no-pivot` para viabilizar a criação de contêineres em chroot.
+7. Reinicia o **`containerd`** e **`dockerd`** (driver `vfs`).
+8. Executa `docker-compose up -d` na pasta `/root/docker/`, subindo os 3 contêineres (`igreja_postgres`, `igreja_frontend`, `igreja_backend`).
+
+---
+
+## 🧪 9. Soluções e Aprendizados de Engenharia
+
+| Desafio | Causa | Solução de Alto Nível |
+|:---|:---|:---|
+| **`remount /, flags: 0x84000`** | `f2fs` do Android e chroot com raiz privada impedem isolamento de mount namespace | Aplicado `mount -o bind $CHROOT $CHROOT` + `mount --make-rshared $CHROOT` no host Android e `mount --make-rslave /` no Debian chroot |
+| **`pivot_root .: invalid argument`** | Kernel Linux proíbe `pivot_root` se a raiz for `MS_SHARED` ou estiver em chroot | Criado wrapper transparente em `/usr/bin/runc` que injeta a flag `--no-pivot` em `runc create/run`, forçando uso de `chroot`/`MS_MOVE` |
+| **`dumpsys/chroot: not found` no boot Magisk** | O Magisk inicia scripts em `/data/adb/service.d/` com um `$PATH` mínimo do Android | Adicionado `export PATH=/system/bin:/system/xbin:/sbin:/vendor/bin:$PATH` no início do `autostart_debian.sh` |
+| **`iptables: false` / Port Mapping** | Android bloqueia manipulação de tabelas NAT do iptables pelo Docker | Utilizado `network_mode: host` para conectar os contêineres direto na pilha de rede do Android |
+| **`mqueue: no such device`** | Kernel Android padrão sem suporte a POSIX Message Queues | Recompilado kernel com `CONFIG_POSIX_MQUEUE=y` |
+| **CORS Preflight (`OPTIONS 400/405`)** | Navegador envia requisição `OPTIONS` prévia e a origem não batia com o IP da Wi-Fi | Adicionado `CORSMiddleware` no FastAPI antes das rotas com `allow_origins=["*"]` e `allow_methods=["*"]` |
+| **Nginx Proxy Reverso** | Centralizar chamadas da Web App sem expor porta 8000 diretamente | Rota `/api/` no `nginx.conf` apontando internamente para `http://127.0.0.1:8000/` |
+| **Restauração de Backup PG17 no PG16** | Backup gerado com `pg_dump -Fc` (PG17) dava incompatibilidade de versão no `pg_restore` 15 | Executado `pg_restore` via contêiner temporário `postgres:17-alpine` apontando para `127.0.0.1:5432` |

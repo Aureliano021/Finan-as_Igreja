@@ -38,7 +38,29 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
 
   // Main Top Tab ('dashboard' | 'explorer')
-  const [mainTab, setMainTab] = useState('dashboard');
+  const [mainTab, setMainTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'explorer' || tab === 'dashboard') {
+        return tab;
+      }
+    }
+    return 'dashboard';
+  });
+
+  // Sync URL query param when mainTab changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (mainTab === 'explorer') {
+        url.searchParams.set('tab', 'explorer');
+      } else {
+        url.searchParams.delete('tab');
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [mainTab]);
 
   // Period View Mode ('month' | 'year') - Default to 'month' as requested
   const [viewMode, setViewMode] = useState('month');
@@ -46,7 +68,7 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
 
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState({ status: 'mock', message: 'Carregando…' });
+  const [connectionStatus, setConnectionStatus] = useState({ status: 'offline', message: 'Carregando…' });
 
   const [membros, setMembros] = useState([]);
   const [dizimos, setDizimos] = useState([]);
@@ -273,14 +295,15 @@ export default function App() {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 'clamp(280px, 60vw, 480px)',
-          height: 'clamp(280px, 60vw, 480px)',
+          width: 'clamp(360px, 70vw, 620px)',
+          height: 'clamp(360px, 70vw, 620px)',
           pointerEvents: 'none',
-          opacity: 0.05,
+          opacity: 0.45,
           zIndex: 0,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          mixBlendMode: 'multiply'
         }}>
           <img src="/church-logo-bw.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
