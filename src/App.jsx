@@ -1,86 +1,69 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { LogOut, RefreshCw, ShieldCheck, Printer, Image, Server, Settings, ArrowRight } from 'lucide-react';
+import AppShell from './components/layout/AppShell';
+import TopBar from './components/layout/TopBar';
+import BottomTabBar from './components/layout/BottomTabBar';
+import StatusCard from './components/auth/StatusCard';
+import Toast from './components/shared/Toast';
+import FAB from './components/launch/FAB';
+import LaunchBottomSheet from './components/launch/LaunchBottomSheet';
+import ApiConfigSheet from './components/account/ApiConfigSheet';
+import PrintableReport from './components/print/PrintableReport';
 
-import Navbar from './components/Navbar';
-import PeriodSelector from './components/PeriodSelector';
-import KpiCards from './components/KpiCards';
-const FinancialCharts = React.lazy(() => import('./components/FinancialCharts'));
-import TransactionsTable from './components/TransactionsTable';
-import DataExplorer from './components/DataExplorer';
-import ApiConfigModal from './components/ApiConfigModal';
-import PrintableReport from './components/PrintableReport';
-import AccessNoticeCard from './components/AccessNoticeCard';
+import BalanceSummaryCard from './components/home/BalanceSummaryCard';
+import QuickStatsRow from './components/home/QuickStatsRow';
+import MiniChartBar from './components/home/MiniChartBar';
+import RecentTransactions from './components/home/RecentTransactions';
+import TransactionsList from './components/transactions/TransactionsList';
+import IncomeVsExpense from './components/analytics/IncomeVsExpense';
+import CategoryBreakdown from './components/analytics/CategoryBreakdown';
+import PeriodPicker from './components/shared/PeriodPicker';
 
 import { fetchAllFinancialData } from './services/api';
-import { getStoredUser, getUserStatus, setAuth, getStoredToken } from './services/auth';
-import { isSameMonthAndYear, getRecordDate, getRecordValue, parseDateParts } from './services/utils';
+import { getStoredUser, getUserStatus, setAuth, getStoredToken, logout } from './services/auth';
+import { getRecordDate, getRecordValue, parseDateParts, MONTHS } from './services/utils';
+import { exportReportCardToPng } from './utils/exportUtils';
 
 /**
- * Generic period filter — avoids duplicating the same logic for each entity.
- * viewMode: 'all' | 'year' | 'month'
+ * Filtro de período genérico
  */
 function filterByPeriod(items, viewMode, year, month) {
   if (!Array.isArray(items)) return [];
   if (viewMode === 'all') return items;
-  return items.filter(item => {
-    const rawDate = item?.data ?? item?.data_despesa ?? item?.data_oferta ?? item?.date ?? item?.created_at ?? item?.data_criacao;
-    if (!rawDate) return true; // Include records even if date is missing
+  return items.filter((item) => {
+    const rawDate = getRecordDate(item) || item?.created_at || item?.data_criacao;
+    if (!rawDate) return true;
     const { year: itemYear, month: itemMonth } = parseDateParts(rawDate);
-    if (!itemYear || !itemMonth) return true; // Include records if unparseable rather than dropping to 0
+    if (!itemYear || !itemMonth) return true;
     if (viewMode === 'year') return itemYear === year;
     return itemYear === year && itemMonth === month;
   });
 }
 
 export default function App() {
-  const currentDate = new Date();
-
-  // Current logged in user & status
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+  const [activeTab, setActiveTab] = useState('home'); // 'home' | 'transactions' | 'analytics' | 'account'
 
-  // Main Top Tab ('dashboard' | 'explorer')
-  const [mainTab, setMainTab] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      if (tab === 'explorer' || tab === 'dashboard') {
-        return tab;
-      }
-    }
-    return 'dashboard';
-  });
-
-  // Sync URL query param when mainTab changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      if (mainTab === 'explorer') {
-        url.searchParams.set('tab', 'explorer');
-      } else {
-        url.searchParams.delete('tab');
-      }
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, [mainTab]);
-
-  // Period View Mode ('month' | 'year') - Default to 'month' as requested
+  // Período (Padrão: Julho/2026 onde há dados cadastrados)
   const [viewMode, setViewMode] = useState('month');
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(2026);
+  const [selectedMonth, setSelectedMonth] = useState(7); // Julho
+
+  // Estados de UI e Diálogos
+  const [isLaunchOpen, setIsLaunchOpen] = useState(false);
+  const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: '' }
 
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState({ status: 'offline', message: 'Carregando…' });
+  const [connectionStatus, setConnectionStatus] = useState({ status: 'online', message: '' });
 
+  // Conjuntos de dados
   const [membros, setMembros] = useState([]);
   const [dizimos, setDizimos] = useState([]);
   const [ofertas, setOfertas] = useState([]);
   const [despesas, setDespesas] = useState([]);
 
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-
-  const dashboardRef = useRef(null);
-
-  // Sync user state on auth events
+  // Sincroniza usuário em eventos de autenticação
   useEffect(() => {
     const syncUser = () => setCurrentUser(getStoredUser());
     window.addEventListener('auth-change', syncUser);
@@ -91,14 +74,13 @@ export default function App() {
     };
   }, []);
 
-  // Load financial data with safety timeout to prevent infinite loading screen
-  const loadData = async () => {
+  // Carrega dados da API backend
+  const loadData = useCallback(async () => {
     setLoading(true);
 
-    // Safety timeout: force stop loading spinner after 6 seconds max
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-      setConnectionStatus(prev => ({
+      setConnectionStatus((prev) => ({
         ...prev,
         message: prev.message || 'A conexão demorou para responder. Verifique se o servidor backend está ativo.'
       }));
@@ -113,10 +95,10 @@ export default function App() {
       setConnectionStatus({
         status: data?.status || 'offline',
         userStatus: data?.userStatus,
-        message: data?.message || 'Não foi possível obter dados da API.'
+        message: data?.message || ''
       });
 
-      // If backend returned online (200 OK), user's access is active! Sync local user status to 'aceito'
+      // Se a resposta for online com sucesso, sincroniza status aceito
       if (data?.status === 'online') {
         const stored = getStoredUser();
         if (stored && getUserStatus(stored) !== 'aceito') {
@@ -125,8 +107,7 @@ export default function App() {
           setCurrentUser(updatedUser);
         }
       }
-    } catch (err) {
-      console.error('Erro ao carregar dados da API:', err);
+    } catch {
       setConnectionStatus({
         status: 'offline',
         message: 'Ocorreu um erro ao comunicar com a API Backend.'
@@ -135,363 +116,416 @@ export default function App() {
       clearTimeout(safetyTimer);
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  // Compute available Years present in DB records
-  const availableYearsAndMonths = React.useMemo(() => {
-    const yearsMap = new Map();
-    const allRecords = [...dizimos, ...ofertas, ...despesas];
-
-    allRecords.forEach(item => {
-      const dateStr = getRecordDate(item);
-      if (!dateStr) return;
-      const parts = dateStr.split('-');
-      if (parts.length >= 2) {
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        if (!isNaN(y) && !isNaN(m) && y > 1900 && y < 2100 && m >= 1 && m <= 12) {
-          if (!yearsMap.has(y)) {
-            yearsMap.set(y, new Set());
-          }
-          yearsMap.get(y).add(m);
-        }
+  // Anos disponíveis com dados
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set([2026, 2025, 2024]);
+    [...dizimos, ...ofertas, ...despesas].forEach((item) => {
+      const d = getRecordDate(item);
+      if (d) {
+        const { year } = parseDateParts(d);
+        if (year && year > 2000 && year < 2100) yearsSet.add(year);
       }
     });
-
-    const sortedYears = Array.from(yearsMap.keys()).sort((a, b) => b - a);
-    return { yearsMap, sortedYears };
+    return Array.from(yearsSet).sort((a, b) => b - a);
   }, [dizimos, ofertas, despesas]);
 
-  // Derived effective selected year — ensures selectedYear falls back to most recent year with data
-  const effectiveSelectedYear = React.useMemo(() => {
-    if (availableYearsAndMonths.sortedYears.length > 0 && !availableYearsAndMonths.sortedYears.includes(selectedYear)) {
-      return availableYearsAndMonths.sortedYears[0];
-    }
-    return selectedYear;
-  }, [availableYearsAndMonths.sortedYears, selectedYear]);
-
-  // Map member IDs to member objects for quick lookup
-  const membrosMap = React.useMemo(() => {
+  // Mapa de membros por ID
+  const membrosMap = useMemo(() => {
     const map = {};
     if (Array.isArray(membros)) {
-      membros.forEach(m => {
-        if (m && m.id != null) {
-          map[m.id] = m;
-        }
+      membros.forEach((m) => {
+        if (m && m.id != null) map[m.id] = m;
       });
     }
     return map;
   }, [membros]);
 
-  // Filter datasets based on viewMode using shared filterByPeriod helper
-  const dizimosFiltered = React.useMemo(
-    () => filterByPeriod(dizimos, viewMode, effectiveSelectedYear, selectedMonth),
-    [dizimos, viewMode, effectiveSelectedYear, selectedMonth]
+  // Dados filtrados pelo período
+  const dizimosFiltered = useMemo(
+    () => filterByPeriod(dizimos, viewMode, selectedYear, selectedMonth),
+    [dizimos, viewMode, selectedYear, selectedMonth]
   );
 
-  const ofertasFiltered = React.useMemo(
-    () => filterByPeriod(ofertas, viewMode, effectiveSelectedYear, selectedMonth),
-    [ofertas, viewMode, effectiveSelectedYear, selectedMonth]
+  const ofertasFiltered = useMemo(
+    () => filterByPeriod(ofertas, viewMode, selectedYear, selectedMonth),
+    [ofertas, viewMode, selectedYear, selectedMonth]
   );
 
-  const despesasFiltered = React.useMemo(
-    () => filterByPeriod(despesas, viewMode, effectiveSelectedYear, selectedMonth),
-    [despesas, viewMode, effectiveSelectedYear, selectedMonth]
+  const despesasFiltered = useMemo(
+    () => filterByPeriod(despesas, viewMode, selectedYear, selectedMonth),
+    [despesas, viewMode, selectedYear, selectedMonth]
   );
 
-  // Memoized totals calculation to prevent unnecessary work on non-data renders
-  const totalDizimos = React.useMemo(() => dizimosFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [dizimosFiltered]);
-  const totalOfertas = React.useMemo(() => ofertasFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [ofertasFiltered]);
-  const totalDespesas = React.useMemo(() => despesasFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [despesasFiltered]);
+  // Cálculos de totais
+  const totalDizimos = useMemo(() => dizimosFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [dizimosFiltered]);
+  const totalOfertas = useMemo(() => ofertasFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [ofertasFiltered]);
+  const totalDespesas = useMemo(() => despesasFiltered.reduce((acc, item) => acc + getRecordValue(item), 0), [despesasFiltered]);
+  const totalEntradas = totalDizimos + totalOfertas;
+  const saldoLiquido = totalEntradas - totalDespesas;
 
-  // Export Dashboard as PNG image (Dynamic import for bundle optimization)
+  // Nome do mês / período formatado
+  const periodLabel = useMemo(() => {
+    if (viewMode === 'year') return `Ano de ${selectedYear}`;
+    const mName = MONTHS.find((m) => m.value === selectedMonth)?.label || '';
+    return `${mName} ${selectedYear}`;
+  }, [viewMode, selectedYear, selectedMonth]);
+
+  const [isExportingPng, setIsExportingPng] = useState(false);
+
   const handleExportPng = async () => {
-    if (!dashboardRef.current) return;
-    setIsExporting(true);
+    if (isExportingPng) return;
+    setIsExportingPng(true);
+    setToast({ type: 'success', message: 'Gerando imagem PNG em alta resolução…' });
+
     try {
-      const html2canvasModule = await import('html2canvas');
-      const html2canvas = html2canvasModule.default || html2canvasModule;
-      const canvas = await html2canvas(dashboardRef.current, {
-        backgroundColor: '#eef2ff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        onclone: (clonedDoc, element) => {
-          // 1. Replicate website's ambient glass background
-          element.style.background = 'linear-gradient(135deg, #eef2ff 0%, #f0fdf4 50%, #f8fafc 100%)';
-          element.style.padding = '28px';
-          element.style.borderRadius = '24px';
-          element.style.boxSizing = 'border-box';
-
-          // 2. High contrast cards floating above background
-          const cards = element.querySelectorAll('.glass-card, .kpi-card');
-          cards.forEach(c => {
-            c.style.background = '#ffffff';
-            c.style.border = '1px solid rgba(226, 232, 240, 0.9)';
-            c.style.boxShadow = '0 10px 25px -4px rgba(15, 23, 42, 0.08)';
-            c.style.borderRadius = '18px';
-            c.style.backdropFilter = 'none';
-          });
-
-          // 3. Elegant Developer Credit & Certification Footer Badge
-          const footer = clonedDoc.createElement('div');
-          footer.style.marginTop = '28px';
-          footer.style.padding = '14px 20px';
-          footer.style.background = '#ffffff';
-          footer.style.border = '1px solid rgba(21, 101, 192, 0.25)';
-          footer.style.borderRadius = '16px';
-          footer.style.display = 'flex';
-          footer.style.alignItems = 'center';
-          footer.style.justifyContent = 'space-between';
-          footer.style.flexWrap = 'wrap';
-          footer.style.gap = '12px';
-          footer.style.boxShadow = '0 4px 16px rgba(15, 23, 42, 0.05)';
-          footer.innerHTML = `
-            <div style="display: flex; alignItems: center; gap: 10px;">
-              <span style="background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%); color: #ffffff; padding: 5px 12px; border-radius: 999px; font-weight: 800; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;">
-                FINANÇAS IGREJA
-              </span>
-              <span style="font-size: 0.8rem; color: #475569; font-weight: 700;">
-                Relatório de Prestação de Contas
-              </span>
-            </div>
-            <div style="font-size: 0.8rem; color: #475569; font-weight: 600;">
-              Sistema desenvolvido por <strong style="color: #0f172a; font-weight: 800;">Aureliano Peixoto Neto</strong>, com o auxílio de Inteligência Artificial
-            </div>
-          `;
-          element.appendChild(footer);
-        }
-      });
-      const image = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `relatorio-financeiro-${viewMode}-${selectedYear}.png`;
-      link.click();
-    } catch (err) {
-      console.error('Erro ao exportar PNG:', err);
+      const filename = await exportReportCardToPng(periodLabel);
+      setToast({ type: 'success', message: `Relatório exportado como "${filename}" com sucesso!` });
+    } catch {
+      setToast({ type: 'error', message: 'Não foi possível gerar a imagem PNG do relatório.' });
     } finally {
-      setIsExporting(false);
+      setIsExportingPng(false);
     }
   };
 
-  // Print Report PDF
-  const handlePrint = () => {
-    window.print();
+  const handleLaunchSuccess = (msg) => {
+    setToast({ type: 'success', message: msg });
+    loadData();
   };
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* 🌊 Ambient Glass Background Orbs & Church Logo Watermark */}
-      <div className="ambient-bg-orbs no-print" aria-hidden="true">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-        <div className="orb orb-3" />
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'clamp(360px, 70vw, 620px)',
-          height: 'clamp(360px, 70vw, 620px)',
-          pointerEvents: 'none',
-          opacity: 0.45,
-          zIndex: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mixBlendMode: 'multiply'
-        }}>
-          <img src="/church-logo-bw.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+  const handleLaunchError = (msg) => {
+    setToast({ type: 'error', message: msg });
+  };
+
+  const isUnauth = !currentUser || connectionStatus.status === 'unauthenticated';
+  const isPendingOrDenied = connectionStatus.status === 'pending_approval' || (currentUser && getUserStatus(currentUser) !== 'aceito');
+
+  if (isUnauth) {
+    return (
+      <AppShell
+        header={<TopBar title="Finanças IMW" connectionStatus="offline" />}
+      >
+        <div className="card" style={{ maxWidth: 440, margin: '40px auto', textAlign: 'center', padding: '32px 20px' }}>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: 8 }}>Autenticação Necessária</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: 20 }}>
+            Você precisa estar autenticado para visualizar a prestação de contas.
+          </p>
+          <a href="/login.html" className="btn btn-primary btn-block">
+            Fazer Login / Criar Conta
+          </a>
         </div>
-      </div>
+      </AppShell>
+    );
+  }
 
-      {/* Top Navigation */}
-      <Navbar
-        mainTab={mainTab}
-        onChangeMainTab={setMainTab}
-        connectionStatus={connectionStatus}
-        onRefresh={loadData}
-        onOpenConfig={() => setIsConfigOpen(true)}
-        onPrint={handlePrint}
-        onExportPng={handleExportPng}
-        isExporting={isExporting}
-      />
+  if (isPendingOrDenied) {
+    return (
+      <AppShell
+        header={<TopBar title="Finanças IMW" user={currentUser} connectionStatus={connectionStatus.status} />}
+      >
+        <StatusCard
+          status={getUserStatus(currentUser)}
+          user={currentUser}
+          message={connectionStatus.message}
+          onRetry={loadData}
+        />
+      </AppShell>
+    );
+  }
 
-      {/* Main Content Area */}
-      <main style={{ flex: 1, maxWidth: '1320px', width: '100%', margin: '0 auto', padding: '24px 16px' }} ref={dashboardRef}>
-
-        {loading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }} role="status" aria-live="polite">
-            <div className="animate-spin" aria-hidden="true" style={{
-              width: 36,
-              height: 36,
-              border: '3px solid var(--border-color)',
-              borderTopColor: 'var(--accent-primary)',
-              borderRadius: '50%',
-              margin: '0 auto 16px auto'
-            }}></div>
-            <p>Carregando dados da igreja…</p>
-          </div>
-        ) : connectionStatus.status === 'unauthenticated' ? (
-          <div style={{
-            maxWidth: '540px',
-            margin: '40px auto',
-            padding: '32px',
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '24px',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.08)',
-            textAlign: 'center'
-          }} role="alert">
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              background: 'rgba(239, 68, 68, 0.1)',
-              color: '#dc2626',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto'
-            }}>
-              🔒
-            </div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 8px 0' }}>
-              Autenticação Necessária
-            </h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>
-              {connectionStatus.message || 'Sessão expirada ou não autenticada. Por favor, entre com sua conta.'}
-            </p>
-            <a
-              href="/login.html"
-              style={{
-                display: 'inline-block',
-                padding: '12px 24px',
-                borderRadius: '9999px',
-                background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
-                color: '#ffffff',
-                fontWeight: 800,
-                fontSize: '0.875rem',
-                textDecoration: 'none',
-                boxShadow: '0 4px 14px rgba(21, 101, 192, 0.3)'
-              }}
-            >
-              Fazer Login / Criar Conta
-            </a>
-          </div>
-        ) : connectionStatus.status === 'offline' ? (
-          <AccessNoticeCard
-            status="offline"
-            user={currentUser}
-            onRefreshData={loadData}
-            message={connectionStatus.message || 'O servidor de API Backend está desligado (funciona sob demanda). Peça ao administrador para ligar o servidor.'}
+  return (
+    <AppShell
+      header={
+        <TopBar
+          title={
+            activeTab === 'home'
+              ? 'Finanças IMW'
+              : activeTab === 'transactions'
+              ? 'Extrato Geral'
+              : activeTab === 'analytics'
+              ? 'Análise Financeira'
+              : 'Minha Conta'
+          }
+          subtitle={periodLabel}
+          user={currentUser}
+          connectionStatus={connectionStatus.status === 'online' ? 'online' : 'offline'}
+          onRefresh={loadData}
+          isRefreshing={loading}
+          onAvatarClick={() => setActiveTab('account')}
+        />
+      }
+      fab={
+        <FAB
+          onClick={() => setIsLaunchOpen(true)}
+          ariaLabel="Lançar Dízimo, Oferta ou Despesa"
+        />
+      }
+      navigation={
+        <BottomTabBar
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+        />
+      }
+      toast={
+        toast ? (
+          <Toast
+            type={toast.type}
+            message={toast.message}
+            onClose={() => setToast(null)}
           />
-        ) : connectionStatus.status === 'pending_approval' ? (
-          <AccessNoticeCard
-            status={connectionStatus.userStatus || getUserStatus(currentUser) || 'pendente'}
-            user={currentUser}
-            onRefreshData={loadData}
-            message={connectionStatus.message}
+        ) : null
+      }
+      modal={
+        <>
+          <LaunchBottomSheet
+            isOpen={isLaunchOpen}
+            onClose={() => setIsLaunchOpen(false)}
+            membros={membros}
+            defaultDate={`${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`}
+            onSuccess={handleLaunchSuccess}
+            onError={handleLaunchError}
           />
-        ) : (
-          <>
-            {/* MAIN TAB 1: PAINEL & GRÁFICOS */}
-            {mainTab === 'dashboard' && (
-              <>
-                {/* Period Selector (Visão Geral / Por Ano / Por Mês) */}
-                <PeriodSelector
-                  viewMode={viewMode}
-                  onChangeViewMode={setViewMode}
-                  selectedYear={effectiveSelectedYear}
-                  selectedMonth={selectedMonth}
-                  onChangeYear={setSelectedYear}
-                  onChangeMonth={setSelectedMonth}
-                  availableYears={availableYearsAndMonths.sortedYears}
-                />
 
-                {/* KPI Summary Cards */}
-                <KpiCards
-                  totalDizimos={totalDizimos}
-                  countDizimos={dizimosFiltered.length}
-                  totalOfertas={totalOfertas}
-                  countOfertas={ofertasFiltered.length}
-                  totalDespesas={totalDespesas}
-                  countDespesas={despesasFiltered.length}
-                />
-
-                {/* Financial Visual Charts (lazy-loaded for bundle optimization) */}
-                <Suspense fallback={
-                  <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '28px' }}>
-                    Carregando gráficos…
-                  </div>
-                }>
-                  <FinancialCharts
-                    dizimosMonth={dizimosFiltered}
-                    ofertasMonth={ofertasFiltered}
-                    despesasMonth={despesasFiltered}
-                    totalDizimos={totalDizimos}
-                    totalOfertas={totalOfertas}
-                    totalDespesas={totalDespesas}
-                  />
-                </Suspense>
-
-                {/* Detailed Data Tables */}
-                <TransactionsTable
-                  dizimosMonth={dizimosFiltered}
-                  ofertasMonth={ofertasFiltered}
-                  despesasMonth={despesasFiltered}
-                  membrosMap={membrosMap}
-                  viewMode={viewMode}
-                  isExporting={isExporting}
-                />
-              </>
-            )}
-
-            {/* MAIN TAB 2: CENTRAL DE CADASTROS & LISTAGEM DEDICADA */}
-            {mainTab === 'explorer' && (
-              <DataExplorer
-                membros={membros}
-                dizimos={dizimos}
-                ofertas={ofertas}
-                despesas={despesas}
-              />
-            )}
-          </>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="no-print" style={{
-        textAlign: 'center',
-        padding: '20px',
-        borderTop: '1px solid var(--border-color)',
-        color: 'var(--text-muted)',
-        fontSize: '0.8rem'
-      }}>
-        Gestão Financeira de Igreja • Desenvolvido em React + Vite & API Python (FastAPI / PostgreSQL)
-      </footer>
-
-      {/* Api Configuration Modal */}
-      <ApiConfigModal
-        isOpen={isConfigOpen}
-        onClose={() => setIsConfigOpen(false)}
-        onSaved={loadData}
-      />
-
-      {/* Printable PDF A4 Report Component */}
+          <ApiConfigSheet
+            isOpen={isApiConfigOpen}
+            onClose={() => setIsApiConfigOpen(false)}
+            onSuccess={(msg) => {
+              setToast({ type: 'success', message: msg });
+              loadData();
+            }}
+          />
+        </>
+      }
+    >
+      {/* Relatório Imprimível Oculto (visível em modo print) */}
       <PrintableReport
-        selectedYear={effectiveSelectedYear}
-        selectedMonth={selectedMonth}
-        dizimosMonth={dizimosFiltered}
-        ofertasMonth={ofertasFiltered}
-        despesasMonth={despesasFiltered}
+        periodLabel={periodLabel}
+        totalEntradas={totalEntradas}
+        totalDespesas={totalDespesas}
+        saldoLiquido={saldoLiquido}
+        dizimos={dizimosFiltered}
+        ofertas={ofertasFiltered}
+        despesas={despesasFiltered}
         membrosMap={membrosMap}
       />
-    </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* TAB 1: HOME / DASHBOARD */}
+        {activeTab === 'home' && (
+          <>
+            <PeriodPicker
+              viewMode={viewMode}
+              onChangeViewMode={setViewMode}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              onChangeYear={setSelectedYear}
+              onChangeMonth={setSelectedMonth}
+              availableYears={availableYears}
+            />
+
+            <BalanceSummaryCard
+              totalEntradas={totalEntradas}
+              totalDespesas={totalDespesas}
+              saldoLiquido={saldoLiquido}
+              periodLabel={periodLabel}
+            />
+
+            <QuickStatsRow
+              totalDizimos={totalDizimos}
+              countDizimos={dizimosFiltered.length}
+              totalOfertas={totalOfertas}
+              countOfertas={ofertasFiltered.length}
+              totalDespesas={totalDespesas}
+              countDespesas={despesasFiltered.length}
+            />
+
+            <MiniChartBar
+              despesas={despesasFiltered}
+              totalDespesas={totalDespesas}
+            />
+
+            <RecentTransactions
+              dizimos={dizimosFiltered}
+              ofertas={ofertasFiltered}
+              despesas={despesasFiltered}
+              membrosMap={membrosMap}
+              onViewAll={() => setActiveTab('transactions')}
+            />
+          </>
+        )}
+
+        {/* TAB 2: EXTRATO COMPLETO DE TRANSAÇÕES */}
+        {activeTab === 'transactions' && (
+          <>
+            <PeriodPicker
+              viewMode={viewMode}
+              onChangeViewMode={setViewMode}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              onChangeYear={setSelectedYear}
+              onChangeMonth={setSelectedMonth}
+              availableYears={availableYears}
+            />
+
+            <TransactionsList
+              dizimos={dizimosFiltered}
+              ofertas={ofertasFiltered}
+              despesas={despesasFiltered}
+              membrosMap={membrosMap}
+            />
+          </>
+        )}
+
+        {/* TAB 3: ANÁLISE E MÉTRICAS */}
+        {activeTab === 'analytics' && (
+          <>
+            <PeriodPicker
+              viewMode={viewMode}
+              onChangeViewMode={setViewMode}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              onChangeYear={setSelectedYear}
+              onChangeMonth={setSelectedMonth}
+              availableYears={availableYears}
+            />
+
+            <IncomeVsExpense
+              totalDizimos={totalDizimos}
+              countDizimos={dizimosFiltered.length}
+              totalOfertas={totalOfertas}
+              countOfertas={ofertasFiltered.length}
+              totalDespesas={totalDespesas}
+              countDespesas={despesasFiltered.length}
+            />
+
+            <CategoryBreakdown
+              despesas={despesasFiltered}
+              totalDespesas={totalDespesas}
+            />
+          </>
+        )}
+
+        {/* TAB 4: CONTA E PREFERÊNCIAS */}
+        {activeTab === 'account' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="card" style={{ padding: '24px 20px', textAlign: 'center' }}>
+              <div style={{
+                width: 56,
+                height: 56,
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--panel-elevated)',
+                border: '1px solid var(--blue-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px auto',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                fontSize: '1.2rem',
+                color: 'var(--blue-glow)'
+              }}>
+                {(currentUser?.nome || 'U').substring(0, 2).toUpperCase()}
+              </div>
+
+              <h3 style={{ fontSize: '1.15rem', marginBottom: 4 }}>
+                {currentUser?.nome || 'Usuário'}
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: 12 }}>
+                {currentUser?.email}
+              </p>
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 12px',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--blue-bg)',
+                color: 'var(--blue-glow)',
+                border: '1px solid var(--blue-border)',
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)'
+              }}>
+                <ShieldCheck size={14} />
+                Acesso Autorizado
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <a
+                href="/gerenciar.html"
+                className="btn btn-panel"
+                style={{ justifyContent: 'space-between' }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Settings size={16} className="text-blue-glow" />
+                  Central de Gestão e Cadastros
+                </span>
+                <ArrowRight size={15} style={{ color: 'var(--muted)' }} />
+              </a>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn btn-panel"
+                style={{ justifyContent: 'flex-start', gap: 8 }}
+              >
+                <Printer size={16} className="text-blue-glow" />
+                Imprimir Relatório A4 ({periodLabel})
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportPng}
+                disabled={isExportingPng}
+                className="btn btn-panel"
+                style={{ justifyContent: 'flex-start', gap: 8 }}
+              >
+                <Image size={16} className="text-blue-glow" />
+                {isExportingPng ? 'Gerando Imagem…' : 'Exportar Relatório em Imagem (PNG)'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsApiConfigOpen(true)}
+                className="btn btn-panel"
+                style={{ justifyContent: 'flex-start', gap: 8 }}
+              >
+                <Server size={16} className="text-blue-glow" />
+                Configurar Servidor da API
+              </button>
+
+              <button
+                type="button"
+                onClick={loadData}
+                className="btn btn-panel"
+                style={{ justifyContent: 'flex-start', gap: 8 }}
+              >
+                <RefreshCw size={15} />
+                Atualizar Dados
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  window.location.href = '/login.html';
+                }}
+                className="btn btn-danger"
+                style={{ marginTop: 8 }}
+              >
+                <LogOut size={16} />
+                Encerrar Sessão
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </AppShell>
   );
 }
