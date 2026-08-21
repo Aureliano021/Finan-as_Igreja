@@ -4,11 +4,13 @@ import AppShell from '../layout/AppShell';
 import TopBar from '../layout/TopBar';
 import Badge from '../shared/Badge';
 import Toast from '../shared/Toast';
+import StatusCard from '../auth/StatusCard';
 import PeriodPicker from '../shared/PeriodPicker';
 import ConfirmSheet from '../shared/ConfirmSheet';
 import MemberFormSheet from './MemberFormSheet';
 import EditRecordSheet from './EditRecordSheet';
 import LaunchBottomSheet from '../launch/LaunchBottomSheet';
+import ApiConfigSheet from '../account/ApiConfigSheet';
 
 import { fetchAllFinancialData, deleteRecord } from '../../services/api';
 import { getStoredUser } from '../../services/auth';
@@ -61,6 +63,8 @@ export default function DataEditorPage() {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [connectionStatus, setConnectionStatus] = useState({ status: 'online', message: '' });
+  const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   // Carrega dados da API
@@ -72,7 +76,15 @@ export default function DataEditorPage() {
       setDizimos(Array.isArray(data?.dizimos) ? data.dizimos : []);
       setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
       setDespesas(Array.isArray(data?.despesas) ? data.despesas : []);
+      setConnectionStatus({
+        status: data?.status || 'offline',
+        message: data?.message || ''
+      });
     } catch {
+      setConnectionStatus({
+        status: 'offline',
+        message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
+      });
       setToast({ type: 'error', message: 'Falha ao sincronizar dados com o servidor.' });
     } finally {
       setLoading(false);
@@ -220,6 +232,44 @@ export default function DataEditorPage() {
       setIsEditRecordOpen(true);
     }
   };
+
+  if (connectionStatus.status === 'offline') {
+    return (
+      <AppShell
+        header={
+          <TopBar
+            title="Central de Gestão"
+            subtitle="Servidor Desconectado"
+            user={currentUser}
+            connectionStatus="offline"
+            backButton={{
+              onClick: () => {
+                window.location.href = '/index.html';
+              }
+            }}
+          />
+        }
+        modal={
+          <ApiConfigSheet
+            isOpen={isApiConfigOpen}
+            onClose={() => setIsApiConfigOpen(false)}
+            onSuccess={(msg) => {
+              setToast({ type: 'success', message: msg });
+              loadData();
+            }}
+          />
+        }
+      >
+        <StatusCard
+          status="offline"
+          user={currentUser}
+          message="O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema."
+          onRetry={loadData}
+          onOpenApiConfig={() => setIsApiConfigOpen(true)}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell

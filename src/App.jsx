@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LogOut, RefreshCw, ShieldCheck, Printer, Image, Server, Settings, ArrowRight } from 'lucide-react';
+import { LogOut, RefreshCw, ShieldCheck, Printer, Image, Server, Settings, ArrowRight, Sun, Moon } from 'lucide-react';
 import AppShell from './components/layout/AppShell';
 import TopBar from './components/layout/TopBar';
 import BottomTabBar from './components/layout/BottomTabBar';
@@ -23,6 +23,7 @@ import { fetchAllFinancialData } from './services/api';
 import { getStoredUser, getUserStatus, setAuth, getStoredToken, logout } from './services/auth';
 import { getRecordDate, getRecordValue, parseDateParts, MONTHS } from './services/utils';
 import { exportReportCardToPng } from './utils/exportUtils';
+import { getStoredTheme, toggleTheme } from './services/theme';
 
 /**
  * Filtro de período genérico
@@ -43,6 +44,7 @@ function filterByPeriod(items, viewMode, year, month) {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'transactions' | 'analytics' | 'account'
+  const [theme, setTheme] = useState(() => getStoredTheme());
 
   // Período (Padrão: Julho/2026 onde há dados cadastrados)
   const [viewMode, setViewMode] = useState('month');
@@ -63,14 +65,19 @@ export default function App() {
   const [ofertas, setOfertas] = useState([]);
   const [despesas, setDespesas] = useState([]);
 
-  // Sincroniza usuário em eventos de autenticação
+  // Sincroniza usuário e tema em eventos
   useEffect(() => {
     const syncUser = () => setCurrentUser(getStoredUser());
+    const syncTheme = (e) => setTheme(e.detail || getStoredTheme());
+
     window.addEventListener('auth-change', syncUser);
     window.addEventListener('storage', syncUser);
+    window.addEventListener('theme-change', syncTheme);
+
     return () => {
       window.removeEventListener('auth-change', syncUser);
       window.removeEventListener('storage', syncUser);
+      window.removeEventListener('theme-change', syncTheme);
     };
   }, []);
 
@@ -203,6 +210,7 @@ export default function App() {
   };
 
   const isUnauth = !currentUser || connectionStatus.status === 'unauthenticated';
+  const isOffline = connectionStatus.status === 'offline';
   const isPendingOrDenied = connectionStatus.status === 'pending_approval' || (currentUser && getUserStatus(currentUser) !== 'aceito');
 
   if (isUnauth) {
@@ -219,6 +227,32 @@ export default function App() {
             Fazer Login / Criar Conta
           </a>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (isOffline) {
+    return (
+      <AppShell
+        header={<TopBar title="Finanças IMW" user={currentUser} connectionStatus="offline" />}
+        modal={
+          <ApiConfigSheet
+            isOpen={isApiConfigOpen}
+            onClose={() => setIsApiConfigOpen(false)}
+            onSuccess={(msg) => {
+              setToast({ type: 'success', message: msg });
+              loadData();
+            }}
+          />
+        }
+      >
+        <StatusCard
+          status="offline"
+          user={currentUser}
+          message="O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema."
+          onRetry={loadData}
+          onOpenApiConfig={() => setIsApiConfigOpen(true)}
+        />
       </AppShell>
     );
   }
@@ -457,6 +491,28 @@ export default function App() {
             </div>
 
             <div className="card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = toggleTheme();
+                  setTheme(next);
+                }}
+                className="btn btn-panel"
+                style={{ justifyContent: 'space-between' }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {theme === 'light' ? (
+                    <Moon size={16} className="text-blue-glow" />
+                  ) : (
+                    <Sun size={16} style={{ color: '#ffb703' }} />
+                  )}
+                  Aparência do Sistema
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                  {theme === 'light' ? 'Modo Claro' : 'Modo Escuro'}
+                </span>
+              </button>
+
               <a
                 href="/gerenciar.html"
                 className="btn btn-panel"

@@ -180,8 +180,12 @@ export async function loginApi(email, senha) {
 
     return { success: false, error: message };
   } catch (err) {
-    console.error('Erro de conexão no login:', err);
-    return { success: false, error: 'Não foi possível conectar ao servidor backend.' };
+    console.warn('Erro de conexão no login:', err);
+    return {
+      success: false,
+      isOffline: true,
+      error: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
+    };
   }
 }
 
@@ -259,7 +263,11 @@ export async function registerApi(nome, email, senha) {
 
     return { success: false, error: message };
   } catch (err) {
-    console.error('Erro de conexão no cadastro:', err);
-    return { success: false, error: 'Não foi possível conectar ao servidor backend.' };
+    console.warn('Erro de conexão no cadastro:', err);
+    return {
+      success: false,
+      isOffline: true,
+      error: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
+    };
   }
 }

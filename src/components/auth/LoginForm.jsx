@@ -40,6 +40,15 @@ export default function LoginForm({
     try {
       const res = await loginApi(cleanEmail, senha);
 
+      if (res.isOffline) {
+        onAccessRestricted({
+          status: 'offline',
+          message: res.error || 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.',
+          user: { email: cleanEmail }
+        });
+        return;
+      }
+
       if (res.isAccessRestriction) {
         onAccessRestricted({
           status: res.status || 'pending',
@@ -55,7 +64,11 @@ export default function LoginForm({
         onError(res.error || 'Credenciais inválidas ou erro no login.');
       }
     } catch {
-      onError('Falha ao conectar com o servidor. Verifique sua conexão.');
+      onAccessRestricted({
+        status: 'offline',
+        message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.',
+        user: { email: cleanEmail }
+      });
     } finally {
       setLoading(false);
     }

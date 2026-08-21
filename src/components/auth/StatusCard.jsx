@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Clock, ShieldAlert, WifiOff, MessageCircle, Copy, Check, RefreshCw, LogOut } from 'lucide-react';
+import { Clock, ShieldAlert, WifiOff, MessageCircle, Copy, Check, RefreshCw, LogOut, Server } from 'lucide-react';
 import { logout } from '../../services/auth';
 
 /**
  * StatusCard Component
- * Exibido quando o usuário está pendente de aprovação, teve acesso negado ou o servidor está offline.
+ * Exibido quando o servidor está offline, acesso pendente de aprovação ou acesso negado.
  */
 export default function StatusCard({
   status = 'pending', // 'pending' | 'denied' | 'offline'
   user = null,
   message = '',
   onRetry = null,
+  onOpenApiConfig = null,
   onBackToLogin = null
 }) {
   const [copied, setCopied] = useState(false);
@@ -21,10 +22,9 @@ export default function StatusCard({
 
   const isDenied = status === 'denied' || status === 'negado';
   const isOffline = status === 'offline';
-  const isPending = !isDenied && !isOffline;
 
   const defaultMessage = isOffline
-    ? 'O servidor backend está offline no momento. Solicite ao administrador a inicialização do serviço.'
+    ? 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
     : isDenied
     ? 'Seu acesso ao sistema foi restrito pelo administrador da congregação.'
     : 'Seu cadastro foi realizado com sucesso e está aguardando a liberação de acesso pelo administrador.';
@@ -33,8 +33,8 @@ export default function StatusCard({
 
   const whatsappMessage = encodeURIComponent(
     isOffline
-      ? `Olá Administrador, estou acessando o app Finanças IMW e o servidor backend está offline. Poderia ativá-lo?`
-      : `Olá Administrador, solicito a liberação de acesso para a conta (${user?.nome || user?.email || 'Novo Usuário'}) no app Finanças IMW.`
+      ? 'Olá! Estou tentando acessar o aplicativo de Finanças da Igreja Metodista Wesleyana, mas o servidor está offline. Poderia ligar o sistema, por favor?'
+      : `Olá Administrador, solicito a liberação de acesso para a minha conta (${user?.nome || user?.email || 'Novo Usuário'}) no app Finanças IMW.`
   );
 
   const handleCopyEmail = async () => {
@@ -43,7 +43,7 @@ export default function StatusCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Silently handle clipboard errors
+      // Ignora erro de clipboard
     }
   };
 
@@ -62,43 +62,71 @@ export default function StatusCard({
     if (onBackToLogin) {
       onBackToLogin();
     } else {
-      window.location.reload();
+      window.location.href = '/login.html';
     }
   };
 
   return (
-    <div className="card" style={{ maxWidth: 480, margin: '24px auto', padding: '28px 20px', textAlign: 'center' }}>
-      {/* Icon Badge */}
+    <div className="card" style={{ maxWidth: 480, margin: '32px auto', padding: '32px 22px', textAlign: 'center', boxShadow: 'var(--shadow-modal)' }}>
+      {/* Icon Badge com animação de pulso se offline */}
       <div style={{
-        width: 54,
-        height: 54,
+        width: 60,
+        height: 60,
         borderRadius: 'var(--radius-full)',
-        background: isDenied ? 'var(--red-bg)' : isOffline ? 'rgba(230, 57, 70, 0.12)' : 'var(--blue-bg)',
+        background: isDenied ? 'var(--red-bg)' : isOffline ? 'var(--red-bg)' : 'var(--blue-bg)',
         border: `1px solid ${isDenied || isOffline ? 'var(--red-border)' : 'var(--blue-border)'}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        margin: '0 auto 16px auto'
+        margin: '0 auto 18px auto',
+        position: 'relative'
       }}>
+        {isOffline && (
+          <span style={{
+            position: 'absolute',
+            inset: -4,
+            borderRadius: 'var(--radius-full)',
+            border: '2px solid var(--red)',
+            opacity: 0.4,
+            animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite'
+          }} />
+        )}
+
         {isDenied ? (
-          <ShieldAlert size={26} className="text-red-glow" />
+          <ShieldAlert size={28} className="text-red-glow" />
         ) : isOffline ? (
-          <WifiOff size={26} className="text-red-glow" />
+          <WifiOff size={28} className="text-red-glow" />
         ) : (
-          <Clock size={26} className="text-blue-glow" />
+          <Clock size={28} className="text-blue-glow" />
         )}
       </div>
 
-      {/* Header */}
-      <h2 style={{ fontSize: '1.25rem', marginBottom: 8 }}>
+      {/* Título Principal */}
+      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 10, color: 'var(--text)' }}>
         {isDenied ? 'Acesso Restrito' : isOffline ? 'Servidor Offline' : 'Aguardando Aprovação'}
       </h2>
 
-      <p style={{ fontSize: '0.875rem', color: 'var(--muted)', marginBottom: 24, lineHeight: 1.5 }}>
-        {displayMessage}
-      </p>
+      {/* Mensagem Explicativa */}
+      <div style={{
+        background: isOffline ? 'var(--red-bg)' : 'var(--bg)',
+        border: `1px solid ${isOffline ? 'var(--red-border)' : 'var(--panel-line)'}`,
+        borderRadius: 'var(--radius-sm)',
+        padding: '14px 16px',
+        marginBottom: 20,
+        textAlign: 'left'
+      }}>
+        <p style={{
+          fontSize: '0.88rem',
+          color: isOffline ? 'var(--text)' : 'var(--muted)',
+          lineHeight: 1.5,
+          fontWeight: isOffline ? 600 : 400,
+          margin: 0
+        }}>
+          {displayMessage}
+        </p>
+      </div>
 
-      {/* User Info Tag (if provided) */}
+      {/* Informações da Conta (se logado) */}
       {user ? (
         <div style={{
           background: 'var(--bg)',
@@ -117,26 +145,27 @@ export default function StatusCard({
         </div>
       ) : null}
 
-      {/* Actions */}
+      {/* Ações de Contato e Resolução */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <a
           href={`https://wa.me/${adminPhone}?text=${whatsappMessage}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-primary"
-          style={{ textDecoration: 'none' }}
+          className="btn btn-primary btn-block"
+          style={{ textDecoration: 'none', justifyContent: 'center' }}
         >
-          <MessageCircle size={17} />
-          Falar com Administrador (WhatsApp)
+          <MessageCircle size={18} />
+          Falar com o Administrador no WhatsApp
         </a>
 
         <button
           type="button"
           onClick={handleCopyEmail}
-          className="btn btn-panel"
+          className="btn btn-panel btn-block"
+          style={{ justifyContent: 'center' }}
         >
           {copied ? <Check size={16} className="text-blue-glow" /> : <Copy size={16} />}
-          {copied ? 'E-mail copiado!' : `Copiar e-mail: ${adminEmail}`}
+          {copied ? 'E-mail copiado para a área de transferência!' : `Copiar e-mail: ${adminEmail}`}
         </button>
 
         {onRetry ? (
@@ -144,22 +173,34 @@ export default function StatusCard({
             type="button"
             onClick={handleRetry}
             disabled={isRetrying}
-            className="btn btn-ghost"
-            style={{ marginTop: 4 }}
+            className="btn btn-panel btn-block"
+            style={{ justifyContent: 'center', marginTop: 4 }}
           >
             <RefreshCw size={15} className={isRetrying ? 'animate-spin text-blue' : ''} />
-            {isRetrying ? 'Verificando status…' : 'Verificar novamente'}
+            {isRetrying ? 'Testando conexão com o servidor…' : 'Tentar reconectar'}
+          </button>
+        ) : null}
+
+        {onOpenApiConfig ? (
+          <button
+            type="button"
+            onClick={onOpenApiConfig}
+            className="btn-ghost"
+            style={{ color: 'var(--blue-glow)', fontSize: '0.8rem', padding: '6px 0', border: 'none', cursor: 'pointer' }}
+          >
+            <Server size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            Configurar Endereço da API
           </button>
         ) : null}
 
         <button
           type="button"
           onClick={handleLogout}
-          className="btn btn-ghost"
-          style={{ color: 'var(--muted)', fontSize: '0.8rem' }}
+          className="btn-ghost"
+          style={{ color: 'var(--muted)', fontSize: '0.8rem', padding: '6px 0', border: 'none', cursor: 'pointer', marginTop: 4 }}
         >
-          <LogOut size={14} />
-          Sair desta conta
+          <LogOut size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+          Encerrar sessão / Trocar de conta
         </button>
       </div>
     </div>

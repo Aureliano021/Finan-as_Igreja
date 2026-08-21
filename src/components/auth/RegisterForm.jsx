@@ -53,6 +53,15 @@ export default function RegisterForm({
     try {
       const res = await registerApi(cleanNome, cleanEmail, senha);
 
+      if (res.isOffline) {
+        onAccessRestricted({
+          status: 'offline',
+          message: res.error || 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.',
+          user: { nome: cleanNome, email: cleanEmail }
+        });
+        return;
+      }
+
       if (res.isAccessRestriction || res.status === 'pendente') {
         onAccessRestricted({
           status: 'pending',
@@ -68,7 +77,11 @@ export default function RegisterForm({
         onError(res.error || 'Erro ao realizar cadastro.');
       }
     } catch {
-      onError('Falha ao conectar com o servidor para criar a conta.');
+      onAccessRestricted({
+        status: 'offline',
+        message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.',
+        user: { nome: cleanNome, email: cleanEmail }
+      });
     } finally {
       setLoading(false);
     }

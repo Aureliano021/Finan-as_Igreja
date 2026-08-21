@@ -1,6 +1,7 @@
-import React from 'react';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, RefreshCw, Sun, Moon } from 'lucide-react';
 import Avatar from '../shared/Avatar';
+import { getStoredTheme, toggleTheme } from '../../services/theme';
 
 /**
  * TopBar Component
@@ -16,6 +17,20 @@ export default function TopBar({
   onAvatarClick = null,
   backButton = null
 }) {
+  const [theme, setTheme] = useState(() => getStoredTheme());
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      setTheme(e.detail || getStoredTheme());
+    };
+    window.addEventListener('theme-change', handleThemeChange);
+    return () => window.removeEventListener('theme-change', handleThemeChange);
+  }, []);
+
+  const handleToggle = () => {
+    const next = toggleTheme();
+    setTheme(next);
+  };
   return (
     <header className="top-bar">
       <div className="top-bar-brand">
@@ -60,6 +75,31 @@ export default function TopBar({
       </div>
 
       <div className="top-bar-actions">
+        {/* Alternador de Tema */}
+        <button
+          onClick={handleToggle}
+          type="button"
+          aria-label={theme === 'light' ? 'Ativar modo escuro' : 'Ativar modo claro'}
+          title={theme === 'light' ? 'Ativar modo escuro' : 'Ativar modo claro'}
+          className="btn-ghost"
+          style={{
+            padding: 8,
+            borderRadius: 'var(--radius-full)',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {theme === 'light' ? (
+            <Moon size={17} className="text-blue-glow" />
+          ) : (
+            <Sun size={17} style={{ color: '#ffb703' }} />
+          )}
+        </button>
+
         {onRefresh && (
           <button
             onClick={onRefresh}

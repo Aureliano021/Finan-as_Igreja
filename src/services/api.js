@@ -102,11 +102,11 @@ export async function checkApiHealth() {
 
 /**
  * Helper to fetch single endpoint safely catching CORS and network errors
- * Uses a 4-second timeout to avoid blocking Promise.all indefinitely
+ * Uses a 3.5-second timeout to avoid blocking Promise.all indefinitely when offline
  */
 async function safeFetchJson(url) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
+  const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout
   
   try {
     const headers = {};
@@ -130,7 +130,6 @@ async function safeFetchJson(url) {
     }
 
     if (res.status === 401) {
-      console.warn(`[API 401] ${url}`);
       return { unauthenticated: true };
     }
 
@@ -138,35 +137,15 @@ async function safeFetchJson(url) {
       const errData = await res.json().catch(() => null);
       const detail = errData?.detail || errData?.message || '';
       const isDenied = typeof detail === 'string' && (detail.toLowerCase().includes('negado') || detail.toLowerCase().includes('denied'));
-      console.warn(`[API 403] ${url}: ${detail}`);
-      return { forbidden: true, status: isDenied ? 'negado' : 'pendente', detail };
-    }
-
-    // Singular / Plural 404 fallback
-    if (res.status === 404) {
-      console.warn(`[API 404] ${url} - tentando variação de endpoint...`);
-      let altUrl = null;
-      if (url.endsWith('/ofertas')) altUrl = url.replace(/\/ofertas$/, '/oferta');
-      else if (url.endsWith('/oferta')) altUrl = url.replace(/\/oferta$/, '/ofertas');
-      else if (url.endsWith('/despesas')) altUrl = url.replace(/\/despesas$/, '/despesa');
-      else if (url.endsWith('/despesa')) altUrl = url.replace(/\/despesa$/, '/despesas');
-      else if (url.endsWith('/dizimos')) altUrl = url.replace(/\/dizimos$/, '/dizimo');
-      else if (url.endsWith('/dizimo')) altUrl = url.replace(/\/dizimo$/, '/dizimos');
-      else if (url.endsWith('/membro')) altUrl = url.replace(/\/membro$/, '/membros');
-      else if (url.endsWith('/membros')) altUrl = url.replace(/\/membros$/, '/membro');
-
-      if (altUrl) {
-        const altRes = await fetch(altUrl, { headers, signal: controller.signal }).catch(() => null);
-        if (altRes && altRes.ok) {
-          res = altRes;
-          console.info(`[API 404 Fallback OK] Utilizando resposta de ${altUrl}`);
-        }
-      }
+      return { 
+        forbidden: true, 
+        status: isDenied ? 'negado' : 'pendente', 
+        detail: detail || 'Acesso restrito ou aguardando aprovação do administrador.' 
+      };
     }
 
     if (res.ok) {
-      const json = await res.json().catch(() => null);
-      console.log(`[API Direct Response] ${url}:`, json);
+      const json = await res.json();
       if (Array.isArray(json)) return json;
       if (json && typeof json === 'object') {
         if (Array.isArray(json.data)) return json.data;
@@ -185,11 +164,8 @@ async function safeFetchJson(url) {
         }
       }
       return [];
-    } else {
-      console.error(`[API Status Error] ${url} respondeu com HTTP ${res.status}`);
     }
   } catch (e) {
-    console.warn(`[API Exception] Fetch falhou para ${url}:`, e);
     return null;
   } finally {
     clearTimeout(timeoutId);
@@ -218,7 +194,6 @@ export async function fetchAllFinancialData() {
   try {
     const [membrosData, dizimosData, ofertasData, despesasData] = await Promise.all([
       safeFetchJson(`${baseUrl}/membro`),
-
       safeFetchJson(`${baseUrl}/dizimos`),
       safeFetchJson(`${baseUrl}/ofertas`),
       safeFetchJson(`${baseUrl}/despesas`)
@@ -261,7 +236,7 @@ export async function fetchAllFinancialData() {
         dizimos: [],
         ofertas: [],
         despesas: [],
-        message: 'O servidor de API Backend está desligado (funciona sob demanda). Peça ao administrador para ligar o servidor.'
+        message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
       };
     }
 
@@ -271,7 +246,7 @@ export async function fetchAllFinancialData() {
       dizimos: Array.isArray(dizimosData) ? dizimosData : [],
       ofertas: Array.isArray(ofertasData) ? ofertasData : [],
       despesas: Array.isArray(despesasData) ? despesasData : [],
-      message: 'Conectado à API Backend local.'
+      message: 'Conectado à API Backend.'
     };
   } catch (error) {
     console.warn('Erro ao buscar dados da API:', error);
@@ -281,7 +256,7 @@ export async function fetchAllFinancialData() {
       dizimos: [],
       ofertas: [],
       despesas: [],
-      message: 'Erro na conexão com a API Backend.'
+      message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
     };
   }
 }

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { ShieldCheck, LogIn, UserPlus, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ShieldCheck, LogIn, UserPlus, AlertCircle, Sun, Moon } from 'lucide-react';
 import { getStoredUser, getUserStatus } from '../../services/auth';
+import { getStoredTheme, toggleTheme } from '../../services/theme';
+import { checkApiHealth } from '../../services/api';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import StatusCard from './StatusCard';
+import ApiConfigSheet from '../account/ApiConfigSheet';
 
 /**
  * LoginPage Component
@@ -14,6 +17,40 @@ export default function LoginPage() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [accessRestriction, setAccessRestriction] = useState(null); // { status, message, user }
   const [errorMessage, setErrorMessage] = useState('');
+  const [theme, setTheme] = useState(() => getStoredTheme());
+  const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
+
+  // Verificação inicial rápida da saúde do servidor
+  const checkHealth = useCallback(async () => {
+    try {
+      const health = await checkApiHealth();
+      if (!health.online) {
+        setAccessRestriction({
+          status: 'offline',
+          message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
+        });
+      } else if (accessRestriction?.status === 'offline') {
+        setAccessRestriction(null);
+      }
+    } catch {
+      setAccessRestriction({
+        status: 'offline',
+        message: 'O servidor da aplicação está offline no momento. Entre em contato com o administrador para ligar o sistema.'
+      });
+    }
+  }, [accessRestriction]);
+
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      setTheme(e.detail || getStoredTheme());
+    };
+    window.addEventListener('theme-change', handleThemeChange);
+    return () => window.removeEventListener('theme-change', handleThemeChange);
+  }, []);
 
   // Se o usuário salvo tiver status pendente ou negado
   const userStatus = currentUser ? getUserStatus(currentUser) : null;
@@ -41,8 +78,38 @@ export default function LoginPage() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px 16px'
+      padding: '24px 16px',
+      position: 'relative'
     }}>
+      {/* Botão de Tema no Login */}
+      <button
+        onClick={() => {
+          const next = toggleTheme();
+          setTheme(next);
+        }}
+        type="button"
+        aria-label={theme === 'light' ? 'Ativar modo escuro' : 'Ativar modo claro'}
+        title={theme === 'light' ? 'Ativar modo escuro' : 'Ativar modo claro'}
+        style={{
+          position: 'fixed',
+          top: 16,
+          right: 16,
+          padding: 8,
+          borderRadius: 'var(--radius-full)',
+          border: '1px solid var(--panel-line)',
+          background: 'var(--panel)',
+          color: 'var(--text)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          boxShadow: 'var(--shadow-card)'
+        }}
+      >
+        {theme === 'light' ? <Moon size={18} className="text-blue-glow" /> : <Sun size={18} style={{ color: '#ffb703' }} />}
+      </button>
+
       {/* Ticker / Top bar indicator */}
       <div style={{
         position: 'fixed',
@@ -89,12 +156,14 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Condition 1: Restrição de Acesso */}
+        {/* Condition 1: Servidor Offline ou Restrição de Acesso */}
         {accessRestriction || isBlocked ? (
           <StatusCard
             status={accessRestriction?.status || userStatus}
             user={accessRestriction?.user || currentUser}
             message={accessRestriction?.message}
+            onRetry={checkHealth}
+            onOpenApiConfig={() => setIsApiConfigOpen(true)}
             onBackToLogin={() => {
               setAccessRestriction(null);
               setCurrentUser(null);
@@ -247,6 +316,15 @@ export default function LoginPage() {
           Gestão Financeira Metodista Wesleyana
         </p>
       </div>
+
+      <ApiConfigSheet
+        isOpen={isApiConfigOpen}
+        onClose={() => setIsApiConfigOpen(false)}
+        onSuccess={() => {
+          setIsApiConfigOpen(false);
+          checkHealth();
+        }}
+      />
     </div>
   );
 }
