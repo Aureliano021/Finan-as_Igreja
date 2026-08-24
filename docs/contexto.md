@@ -95,8 +95,8 @@ Como medida de proteção contra ataques e economia operacional, o servidor da a
      - **⚙️ Configurar API:** Permite alterar o endereço do servidor se necessário.
 
 3. **Status de Conexão no Frontend (`connectionStatus.status`):**
-   - `'online'`: Backend operacional -> Carrega dashboard/gestão normalmente.
-   - `'offline'`: Backend desligado/sem rede -> Bloqueia visualizações e exibe card offline dedicado.
+   - `'online'`: Backend operacional -> Carrega dashboard completo.
+   - `'offline'`: Backend desligado/sem rede -> Bloqueia tela vazia e abre `StatusCard` de offline.
    - `'pending_approval'`: Usuário aguardando aprovação -> Exibe card de aprovação de cadastro.
    - `'unauthenticated'`: Sem token ou token expirado -> Redireciona para o login.
 

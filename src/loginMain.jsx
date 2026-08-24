@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './services/theme.js'
 import './index.css'
 import LoginPage from './components/auth/LoginPage.jsx'
 import ErrorBoundary from './components/shared/ErrorBoundary.jsx'

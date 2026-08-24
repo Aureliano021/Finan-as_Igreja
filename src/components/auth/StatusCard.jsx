@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Clock, ShieldAlert, WifiOff, MessageCircle, Copy, Check, RefreshCw, LogOut } from 'lucide-react';
+import { Clock, ShieldAlert, WifiOff, MessageCircle, Copy, Check, RefreshCw, LogOut, Server } from 'lucide-react';
 import { logout } from '../../services/auth';
 
 /**
  * StatusCard Component
- * Exibido quando o usuário está pendente de aprovação, teve acesso negado ou o servidor está offline.
+ * Exibido quando o servidor está offline, acesso pendente de aprovação ou acesso negado.
  */
 export default function StatusCard({
   status = 'pending', // 'pending' | 'denied' | 'offline'
@@ -12,7 +12,8 @@ export default function StatusCard({
   message = '',
   onRetry = null,
   onBackToLogin = null,
-  onConfigureApi = null
+  onConfigureApi = null,
+  onOpenApiConfig = null
 }) {
   const [copied, setCopied] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -22,7 +23,7 @@ export default function StatusCard({
 
   const isDenied = status === 'denied' || status === 'negado';
   const isOffline = status === 'offline';
-  const isPending = !isDenied && !isOffline;
+  const handleConfigApi = onConfigureApi || onOpenApiConfig;
 
   const defaultMessage = isOffline
     ? 'O servidor backend está desligado (sistema sob demanda). Solicite ao administrador a inicialização do serviço para continuar utilizando o aplicativo.'
@@ -34,8 +35,8 @@ export default function StatusCard({
 
   const whatsappMessage = encodeURIComponent(
     isOffline
-      ? `Olá Administrador, estou no app Finanças IMW e o servidor backend está offline. Poderia ligá-lo, por favor?`
-      : `Olá Administrador, solicito a liberação de acesso para a conta (${user?.nome || user?.email || 'Novo Usuário'}) no app Finanças IMW.`
+      ? 'Olá! Estou no app Finanças IMW e o servidor backend está offline. Poderia ligá-lo, por favor?'
+      : `Olá Administrador, solicito a liberação de acesso para a minha conta (${user?.nome || user?.email || 'Novo Usuário'}) no app Finanças IMW.`
   );
 
   const handleCopyEmail = async () => {
@@ -44,7 +45,7 @@ export default function StatusCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Silently handle clipboard errors
+      // Ignora erro de clipboard
     }
   };
 
@@ -120,7 +121,7 @@ export default function StatusCard({
         {displayMessage}
       </p>
 
-      {/* User Info Tag (if provided) */}
+      {/* Informações da Conta (se logado) */}
       {user ? (
         <div style={{
           background: 'var(--bg)',
@@ -139,7 +140,7 @@ export default function StatusCard({
         </div>
       ) : null}
 
-      {/* Actions */}
+      {/* Ações de Contato e Resolução */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <a
           href={`https://wa.me/${adminPhone}?text=${whatsappMessage}`}
@@ -197,10 +198,10 @@ export default function StatusCard({
           paddingTop: 12,
           borderTop: '1px solid var(--panel-line)'
         }}>
-          {onConfigureApi ? (
+          {handleConfigApi ? (
             <button
               type="button"
-              onClick={onConfigureApi}
+              onClick={handleConfigApi}
               className="btn btn-ghost"
               style={{
                 fontSize: '0.78rem',
@@ -211,6 +212,7 @@ export default function StatusCard({
                 gap: 4
               }}
             >
+              <Server size={13} />
               Configurar API
             </button>
           ) : (

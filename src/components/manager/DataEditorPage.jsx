@@ -4,12 +4,12 @@ import AppShell from '../layout/AppShell';
 import TopBar from '../layout/TopBar';
 import Badge from '../shared/Badge';
 import Toast from '../shared/Toast';
+import StatusCard from '../auth/StatusCard';
 import PeriodPicker from '../shared/PeriodPicker';
 import ConfirmSheet from '../shared/ConfirmSheet';
 import MemberFormSheet from './MemberFormSheet';
 import EditRecordSheet from './EditRecordSheet';
 import LaunchBottomSheet from '../launch/LaunchBottomSheet';
-import StatusCard from '../auth/StatusCard';
 import ApiConfigSheet from '../account/ApiConfigSheet';
 
 import { fetchAllFinancialData, deleteRecord, checkApiHealth } from '../../services/api';
@@ -39,6 +39,7 @@ export default function DataEditorPage() {
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ status: 'online', message: '' });
   const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
+  const [toast, setToast] = useState(null);
 
   // Período de visualização
   const [viewMode, setViewMode] = useState('month');
@@ -65,8 +66,6 @@ export default function DataEditorPage() {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [toast, setToast] = useState(null);
-
   // Carrega dados da API
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -76,7 +75,6 @@ export default function DataEditorPage() {
       setDizimos(Array.isArray(data?.dizimos) ? data.dizimos : []);
       setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
       setDespesas(Array.isArray(data?.despesas) ? data.despesas : []);
-
       setConnectionStatus({
         status: data?.status || 'offline',
         message: data?.message || ''
@@ -84,7 +82,7 @@ export default function DataEditorPage() {
     } catch {
       setConnectionStatus({
         status: 'offline',
-        message: 'Falha na conexão com o servidor de banco de dados.'
+        message: 'O servidor backend foi desligado ou está inacessível. Peça ao administrador para ligá-lo.'
       });
       setToast({ type: 'error', message: 'Falha ao sincronizar dados com o servidor.' });
     } finally {
@@ -344,6 +342,16 @@ export default function DataEditorPage() {
             />
           ) : null
         }
+        modal={
+          <ApiConfigSheet
+            isOpen={isApiConfigOpen}
+            onClose={() => setIsApiConfigOpen(false)}
+            onSuccess={(msg) => {
+              setToast({ type: 'success', message: msg });
+              loadData();
+            }}
+          />
+        }
       >
         <StatusCard
           status="offline"
@@ -351,11 +359,6 @@ export default function DataEditorPage() {
           message={connectionStatus.message || 'O servidor backend foi desligado ou está inacessível. Peça ao administrador para ligá-lo.'}
           onRetry={loadData}
           onConfigureApi={() => setIsApiConfigOpen(true)}
-        />
-        <ApiConfigSheet
-          isOpen={isApiConfigOpen}
-          onClose={() => setIsApiConfigOpen(false)}
-          onSuccess={() => loadData()}
         />
       </AppShell>
     );
