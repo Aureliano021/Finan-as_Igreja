@@ -9,9 +9,11 @@ import ConfirmSheet from '../shared/ConfirmSheet';
 import MemberFormSheet from './MemberFormSheet';
 import EditRecordSheet from './EditRecordSheet';
 import LaunchBottomSheet from '../launch/LaunchBottomSheet';
+import StatusCard from '../auth/StatusCard';
+import ApiConfigSheet from '../account/ApiConfigSheet';
 
-import { fetchAllFinancialData, deleteRecord } from '../../services/api';
-import { getStoredUser } from '../../services/auth';
+import { fetchAllFinancialData, deleteRecord, checkApiHealth } from '../../services/api';
+import { getStoredUser, getUserStatus } from '../../services/auth';
 import { formatCurrency, formatDateBR, getRecordDate, getRecordValue, parseDateParts, MONTHS } from '../../services/utils';
 
 /**
@@ -35,6 +37,8 @@ export default function DataEditorPage() {
   const [activeTab, setActiveTab] = useState('membros'); // 'membros' | 'dizimos' | 'ofertas' | 'despesas'
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState({ status: 'online', message: '' });
+  const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
 
   // Período de visualização
   const [viewMode, setViewMode] = useState('month');
@@ -72,7 +76,16 @@ export default function DataEditorPage() {
       setDizimos(Array.isArray(data?.dizimos) ? data.dizimos : []);
       setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
       setDespesas(Array.isArray(data?.despesas) ? data.despesas : []);
+
+      setConnectionStatus({
+        status: data?.status || 'offline',
+        message: data?.message || ''
+      });
     } catch {
+      setConnectionStatus({
+        status: 'offline',
+        message: 'Falha na conexão com o servidor de banco de dados.'
+      });
       setToast({ type: 'error', message: 'Falha ao sincronizar dados com o servidor.' });
     } finally {
       setLoading(false);
@@ -82,6 +95,64 @@ export default function DataEditorPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Monitoramento contínuo de status da API (heartbeat & retorno de foco)
+  useEffect(() => {
+    let isMounted = true;
+
+    const verifyServerHealth = async () => {
+      if (loading) return;
+
+      try {
+        const health = await checkApiHealth();
+        if (!isMounted) return;
+
+        if (!health.online) {
+          setConnectionStatus((prev) => {
+            if (prev.status !== 'offline') {
+              return {
+                status: 'offline',
+                message: 'O servidor de API Backend foi desligado ou perdeu a conexão. Peça ao administrador para ligá-lo.'
+              };
+            }
+            return prev;
+          });
+        } else {
+          setConnectionStatus((prev) => {
+            if (prev.status === 'offline') {
+              loadData();
+            }
+            return prev;
+          });
+        }
+      } catch {
+        if (isMounted) {
+          setConnectionStatus({
+            status: 'offline',
+            message: 'O servidor de API Backend foi desligado ou perdeu a conexão. Peça ao administrador para ligá-lo.'
+          });
+        }
+      }
+    };
+
+    const intervalId = setInterval(verifyServerHealth, 20000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        verifyServerHealth();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [loading, loadData]);
 
   // Anos disponíveis
   const availableYears = useMemo(() => {
@@ -221,6 +292,75 @@ export default function DataEditorPage() {
     }
   };
 
+  // Checagens de acesso e conectividade
+  const isUnauth = !currentUser || connectionStatus.status === 'unauthenticated';
+  const isOffline = connectionStatus.status === 'offline';
+
+  if (isUnauth) {
+    return (
+      <AppShell
+        header={
+          <TopBar
+            title="Central de Gestão"
+            subtitle="Administração e Cadastros"
+            connectionStatus="offline"
+            backButton={{ onClick: () => { window.location.href = '/index.html'; } }}
+          />
+        }
+      >
+        <div className="card" style={{ maxWidth: 440, margin: '40px auto', textAlign: 'center', padding: '32px 20px' }}>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: 8 }}>Autenticação Necessária</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: 20 }}>
+            Você precisa estar autenticado para acessar a área administrativa.
+          </p>
+          <a href="/login.html" className="btn btn-primary btn-block">
+            Fazer Login / Criar Conta
+          </a>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (isOffline) {
+    return (
+      <AppShell
+        header={
+          <TopBar
+            title="Central de Gestão"
+            subtitle="Administração e Cadastros"
+            user={currentUser}
+            connectionStatus="offline"
+            onRefresh={loadData}
+            isRefreshing={loading}
+            backButton={{ onClick: () => { window.location.href = '/index.html'; } }}
+          />
+        }
+        toast={
+          toast ? (
+            <Toast
+              type={toast.type}
+              message={toast.message}
+              onClose={() => setToast(null)}
+            />
+          ) : null
+        }
+      >
+        <StatusCard
+          status="offline"
+          user={currentUser}
+          message={connectionStatus.message || 'O servidor backend foi desligado ou está inacessível. Peça ao administrador para ligá-lo.'}
+          onRetry={loadData}
+          onConfigureApi={() => setIsApiConfigOpen(true)}
+        />
+        <ApiConfigSheet
+          isOpen={isApiConfigOpen}
+          onClose={() => setIsApiConfigOpen(false)}
+          onSuccess={() => loadData()}
+        />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       header={
@@ -228,6 +368,7 @@ export default function DataEditorPage() {
           title="Central de Gestão"
           subtitle="Administração e Cadastros"
           user={currentUser}
+          connectionStatus={connectionStatus.status === 'online' ? 'online' : 'offline'}
           onRefresh={loadData}
           isRefreshing={loading}
           backButton={{

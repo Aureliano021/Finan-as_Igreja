@@ -206,3 +206,49 @@ export function categorizeExpense(description) {
   
   return 'Outras Despesas';
 }
+
+/**
+ * Find the most recent year and month that contains at least one financial record.
+ * Falls back to current system date if no records exist in the database.
+ * 
+ * @param {Array} dizimos
+ * @param {Array} ofertas
+ * @param {Array} despesas
+ * @returns {{ year: number, month: number }}
+ */
+export function findLatestRecordPeriod(dizimos = [], ofertas = [], despesas = []) {
+  let maxPeriodKey = -1;
+  let latestYear = null;
+  let latestMonth = null;
+
+  const allRecords = [
+    ...(Array.isArray(dizimos) ? dizimos : []),
+    ...(Array.isArray(ofertas) ? ofertas : []),
+    ...(Array.isArray(despesas) ? despesas : [])
+  ];
+
+  for (const item of allRecords) {
+    const rawDate = getRecordDate(item);
+    if (!rawDate) continue;
+    const { year, month } = parseDateParts(rawDate);
+    if (year && month && year >= 2000 && year <= 2100 && month >= 1 && month <= 12) {
+      const periodKey = year * 100 + month;
+      if (periodKey > maxPeriodKey) {
+        maxPeriodKey = periodKey;
+        latestYear = year;
+        latestMonth = month;
+      }
+    }
+  }
+
+  if (latestYear && latestMonth) {
+    return { year: latestYear, month: latestMonth };
+  }
+
+  // Fallback para a data atual do sistema se a base estiver vazia
+  const now = new Date();
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1
+  };
+}

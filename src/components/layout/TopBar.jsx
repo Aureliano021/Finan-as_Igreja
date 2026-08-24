@@ -1,10 +1,11 @@
 import React from 'react';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Sun, Moon } from 'lucide-react';
 import Avatar from '../shared/Avatar';
+import useTheme from '../../hooks/useTheme';
 
 /**
  * TopBar Component
- * Header minimalista e refinado com a identidade do projeto.
+ * Header minimalista e refinado com a identidade do projeto e botão de alternância de tema.
  */
 export default function TopBar({
   title = 'Finanças IMW',
@@ -14,8 +15,16 @@ export default function TopBar({
   onRefresh = null,
   isRefreshing = false,
   onAvatarClick = null,
-  backButton = null
+  backButton = null,
+  theme: customTheme = null,
+  onToggleTheme = null,
+  showThemeToggle = true
 }) {
+  const defaultThemeHook = useTheme();
+  const theme = customTheme || defaultThemeHook.theme;
+  const toggleTheme = onToggleTheme || defaultThemeHook.toggleTheme;
+  const isDark = theme === 'dark';
+
   return (
     <header className="top-bar">
       <div className="top-bar-brand">
@@ -46,7 +55,8 @@ export default function TopBar({
                 height: 8,
                 borderRadius: '50%',
                 backgroundColor: connectionStatus === 'online' ? 'var(--blue)' : 'var(--red)',
-                boxShadow: connectionStatus === 'online' ? '0 0 8px var(--blue)' : '0 0 8px var(--red)'
+                boxShadow: connectionStatus === 'online' ? '0 0 8px var(--blue)' : '0 0 8px var(--red)',
+                transition: 'background-color 200ms ease, box-shadow 200ms ease'
               }}
             />
             <h1 className="top-bar-title">{title}</h1>
@@ -60,11 +70,12 @@ export default function TopBar({
       </div>
 
       <div className="top-bar-actions">
-        {onRefresh && (
+        {showThemeToggle && (
           <button
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            aria-label="Atualizar dados"
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'}
+            title={isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'}
             className="btn-ghost"
             style={{
               padding: 8,
@@ -72,7 +83,49 @@ export default function TopBar({
               border: 'none',
               cursor: 'pointer',
               color: 'var(--muted)',
-              display: 'flex'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast)'
+            }}
+          >
+            {isDark ? (
+              <Sun
+                size={17}
+                style={{
+                  color: '#fbbf24',
+                  transition: 'transform var(--transition-fast)'
+                }}
+              />
+            ) : (
+              <Moon
+                size={17}
+                style={{
+                  color: '#6366f1',
+                  transition: 'transform var(--transition-fast)'
+                }}
+              />
+            )}
+          </button>
+        )}
+
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            aria-label="Atualizar dados"
+            title="Atualizar dados"
+            className="btn-ghost"
+            style={{
+              padding: 8,
+              borderRadius: 'var(--radius-full)',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--muted)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin text-blue' : ''} />

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LogOut, RefreshCw, ShieldCheck, Printer, Image, Server, Settings, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { LogOut, RefreshCw, ShieldCheck, Printer, Image, Server, Settings, ArrowRight, Sun, Moon } from 'lucide-react';
 import AppShell from './components/layout/AppShell';
 import TopBar from './components/layout/TopBar';
 import BottomTabBar from './components/layout/BottomTabBar';
@@ -9,6 +9,7 @@ import FAB from './components/launch/FAB';
 import LaunchBottomSheet from './components/launch/LaunchBottomSheet';
 import ApiConfigSheet from './components/account/ApiConfigSheet';
 import PrintableReport from './components/print/PrintableReport';
+import useTheme from './hooks/useTheme';
 
 import BalanceSummaryCard from './components/home/BalanceSummaryCard';
 import QuickStatsRow from './components/home/QuickStatsRow';
@@ -19,9 +20,9 @@ import IncomeVsExpense from './components/analytics/IncomeVsExpense';
 import CategoryBreakdown from './components/analytics/CategoryBreakdown';
 import PeriodPicker from './components/shared/PeriodPicker';
 
-import { fetchAllFinancialData } from './services/api';
+import { fetchAllFinancialData, checkApiHealth } from './services/api';
 import { getStoredUser, getUserStatus, setAuth, getStoredToken, logout } from './services/auth';
-import { getRecordDate, getRecordValue, parseDateParts, MONTHS } from './services/utils';
+import { getRecordDate, getRecordValue, parseDateParts, MONTHS, findLatestRecordPeriod } from './services/utils';
 import { exportReportCardToPng } from './utils/exportUtils';
 
 /**
@@ -41,13 +42,16 @@ function filterByPeriod(items, viewMode, year, month) {
 }
 
 export default function App() {
+  const { theme, isDark, toggleTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'transactions' | 'analytics' | 'account'
 
-  // Período (Padrão: Julho/2026 onde há dados cadastrados)
+  // Período (Inicializado com a data corrente, atualizado dinamicamente com o último mês com registros)
+  const initialDate = new Date();
   const [viewMode, setViewMode] = useState('month');
-  const [selectedYear, setSelectedYear] = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(7); // Julho
+  const [selectedYear, setSelectedYear] = useState(initialDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(initialDate.getMonth() + 1);
+  const hasAutoSetPeriodRef = useRef(false);
 
   // Estados de UI e Diálogos
   const [isLaunchOpen, setIsLaunchOpen] = useState(false);
@@ -88,10 +92,26 @@ export default function App() {
 
     try {
       const data = await fetchAllFinancialData();
-      setMembros(Array.isArray(data?.membros) ? data.membros : []);
-      setDizimos(Array.isArray(data?.dizimos) ? data.dizimos : []);
-      setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
-      setDespesas(Array.isArray(data?.despesas) ? data.despesas : []);
+      const loadedMembros = Array.isArray(data?.membros) ? data.membros : [];
+      const loadedDizimos = Array.isArray(data?.dizimos) ? data.dizimos : [];
+      const loadedOfertas = Array.isArray(data?.ofertas) ? data.ofertas : [];
+      const loadedDespesas = Array.isArray(data?.despesas) ? data.despesas : [];
+
+      setMembros(loadedMembros);
+      setDizimos(loadedDizimos);
+      setOfertas(loadedOfertas);
+      setDespesas(loadedDespesas);
+
+      // Ao carregar dados com sucesso na primeira vez, define dinamicamente o último mês com registros
+      if (!hasAutoSetPeriodRef.current && (data?.status === 'online' || loadedDizimos.length > 0 || loadedOfertas.length > 0 || loadedDespesas.length > 0)) {
+        const latest = findLatestRecordPeriod(loadedDizimos, loadedOfertas, loadedDespesas);
+        if (latest?.year && latest?.month) {
+          setSelectedYear(latest.year);
+          setSelectedMonth(latest.month);
+          hasAutoSetPeriodRef.current = true;
+        }
+      }
+
       setConnectionStatus({
         status: data?.status || 'offline',
         userStatus: data?.userStatus,
@@ -121,6 +141,66 @@ export default function App() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Monitoramento contínuo de status da API / Servidor Backend (heartbeat & retorno de foco)
+  useEffect(() => {
+    let isMounted = true;
+
+    const verifyServerHealth = async () => {
+      if (loading) return;
+
+      try {
+        const health = await checkApiHealth();
+        if (!isMounted) return;
+
+        if (!health.online) {
+          setConnectionStatus((prev) => {
+            if (prev.status !== 'offline') {
+              return {
+                status: 'offline',
+                message: 'O servidor de API Backend foi desligado ou perdeu a conexão. Peça ao administrador para ligá-lo.'
+              };
+            }
+            return prev;
+          });
+        } else {
+          setConnectionStatus((prev) => {
+            if (prev.status === 'offline') {
+              loadData();
+            }
+            return prev;
+          });
+        }
+      } catch {
+        if (isMounted) {
+          setConnectionStatus({
+            status: 'offline',
+            message: 'O servidor de API Backend foi desligado ou perdeu a conexão. Peça ao administrador para ligá-lo.'
+          });
+        }
+      }
+    };
+
+    // Checa a cada 20 segundos
+    const intervalId = setInterval(verifyServerHealth, 20000);
+
+    // Checa imediatamente quando o usuário volta para a aba da aplicação
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        verifyServerHealth();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [loading, loadData]);
 
   // Anos disponíveis com dados
   const availableYears = useMemo(() => {
@@ -204,6 +284,7 @@ export default function App() {
 
   const isUnauth = !currentUser || connectionStatus.status === 'unauthenticated';
   const isPendingOrDenied = connectionStatus.status === 'pending_approval' || (currentUser && getUserStatus(currentUser) !== 'aceito');
+  const isOffline = connectionStatus.status === 'offline';
 
   if (isUnauth) {
     return (
@@ -223,6 +304,44 @@ export default function App() {
     );
   }
 
+  if (isOffline) {
+    return (
+      <AppShell
+        header={
+          <TopBar
+            title="Finanças IMW"
+            user={currentUser}
+            connectionStatus="offline"
+            onRefresh={loadData}
+            isRefreshing={loading}
+          />
+        }
+        toast={
+          toast ? (
+            <Toast
+              type={toast.type}
+              message={toast.message}
+              onClose={() => setToast(null)}
+            />
+          ) : null
+        }
+      >
+        <StatusCard
+          status="offline"
+          user={currentUser}
+          message={connectionStatus.message || 'O servidor de API Backend está desligado (funciona sob demanda). Peça ao administrador para ligá-lo.'}
+          onRetry={loadData}
+          onConfigureApi={() => setIsApiConfigOpen(true)}
+        />
+        <ApiConfigSheet
+          isOpen={isApiConfigOpen}
+          onClose={() => setIsApiConfigOpen(false)}
+          onSuccess={() => loadData()}
+        />
+      </AppShell>
+    );
+  }
+
   if (isPendingOrDenied) {
     return (
       <AppShell
@@ -233,6 +352,12 @@ export default function App() {
           user={currentUser}
           message={connectionStatus.message}
           onRetry={loadData}
+          onConfigureApi={() => setIsApiConfigOpen(true)}
+        />
+        <ApiConfigSheet
+          isOpen={isApiConfigOpen}
+          onClose={() => setIsApiConfigOpen(false)}
+          onSuccess={() => loadData()}
         />
       </AppShell>
     );
@@ -468,6 +593,26 @@ export default function App() {
                 </span>
                 <ArrowRight size={15} style={{ color: 'var(--muted)' }} />
               </a>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="btn btn-panel"
+                style={{ justifyContent: 'space-between' }}
+                aria-label={`Alternar tema atual: ${isDark ? 'Modo Escuro' : 'Modo Claro'}`}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {isDark ? (
+                    <Sun size={16} style={{ color: '#fbbf24' }} />
+                  ) : (
+                    <Moon size={16} style={{ color: '#6366f1' }} />
+                  )}
+                  Aparência: <strong>{isDark ? 'Modo Escuro (Dark)' : 'Modo Claro (Light)'}</strong>
+                </span>
+                <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>
+                  Alternar ☀️/🌙
+                </span>
+              </button>
 
               <button
                 type="button"
