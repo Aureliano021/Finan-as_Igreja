@@ -1,12 +1,101 @@
 version: '3.8'
 
+# ============================================================
+# Rede interna isolada — os containers se comunicam aqui,
+# mas nenhuma porta fica acessível diretamente da internet.
+# O Cloudflare Tunnel é o único ponto de entrada externo.
+# ============================================================
+networks:
+  igreja_net:
+    driver: bridge
+
+# ============================================================
+# Volume persistente — os dados do Postgres ficam aqui.
+# Mesmo que o container seja destruído, os dados sobrevivem.
+# ============================================================
+volumes:
+  postgres_data:
+
 services:
+
+  # ----------------------------------------------------------
+  # BANCO DE DADOS
+  # - Só acessível internamente (sem "ports:" exposto ao host)
+  # - Dados salvos no volume postgres_data
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: igreja_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bi_learning
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - igreja_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bi_learning"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------
+  # BACKEND FastAPI (porta 8000 interna)
+  # - Buildado a partir do Dockerfile em ../ (pasta do backend)
+  # - Sem "ports:" — só o nginx fala com ele via rede interna
+  # ----------------------------------------------------------
+  backend:
+    build:
+      context: ../        # raiz de FinanciasIgreja onde está o Dockerfile do backend
+      dockerfile: Dockerfile
+    container_name: igreja_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres   # nome do serviço na rede interna (não 127.0.0.1!)
+      DB_PORT: 5432
+      DB_NAME: bi_learning
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: HS256
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - igreja_net
+
+  # ----------------------------------------------------------
+  # FRONTEND Nginx (porta 80 interna)
+  # - Serve o React buildado e faz proxy /api/ -> backend:8000
+  # - Comunica-se internamente com o Tunnel via http://app:80
+  # ----------------------------------------------------------
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      network: host
     container_name: igreja_financas_app
-    restart: always
-    network_mode: host
-    ipc: host
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:80:80"
+    depends_on:
+      - backend
+    networks:
+      - igreja_net
+
+  # ----------------------------------------------------------
+  # CLOUDFLARE TUNNEL
+  # - Conecta sua aplicação com a internet de forma segura
+  # - Comunicação direta pela rede interna com o app (http://app:80)
+  # ----------------------------------------------------------
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: igreja_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - igreja_net
+    depends_on:
+      - app
+
