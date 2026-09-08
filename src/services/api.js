@@ -2,30 +2,39 @@ import { logout, getStoredToken } from './auth';
 
 const API_URL_KEY = 'igreja_api_url';
 
-export function getApiUrl() {
+export function normalizeApiUrl(rawUrl = '') {
   const currentHost = (typeof window !== 'undefined' && window.location && window.location.hostname) 
     ? window.location.hostname 
     : 'localhost';
 
-  const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem(API_URL_KEY) : null;
-  let url = '';
-  
-  if (saved) {
-    if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-      if (saved.includes('localhost') || saved.includes('127.0.0.1')) {
-        url = saved.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
-      } else {
-        url = saved;
-      }
-    } else {
-      url = saved;
-    }
-  } else {
-    // Default to /api (Vite Proxy) which forwards mobile requests directly to host's backend port 8000
-    url = '/api';
+  let url = (rawUrl || '').trim();
+  if (!url || url === '/api') return '/api';
+
+  // Se o usuário digitou apenas o número da porta (ex: "9000" ou ":9000")
+  if (/^:?\d+$/.test(url)) {
+    const port = url.replace(':', '');
+    return `http://${currentHost}:${port}`;
   }
-  
-  return url.trim().replace(/\/+$/, '');
+
+  // Se o usuário digitou sem protocolo (ex: "192.168.1.40:9000" ou "localhost:9000")
+  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('/')) {
+    url = `http://${url}`;
+  }
+
+  // Se estiver em mobile/rede externa e tiver localhost ou 127.0.0.1
+  if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+    url = url.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
+  }
+
+  return url.replace(/\/+$/, '');
+}
+
+export function getApiUrl() {
+  const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem(API_URL_KEY) : null;
+  if (saved) {
+    return normalizeApiUrl(saved);
+  }
+  return '/api';
 }
 
 export function getFallbackApiUrl(primaryUrl = '') {
@@ -36,15 +45,17 @@ export function getFallbackApiUrl(primaryUrl = '') {
   const cleanPrimary = (primaryUrl || '').trim().replace(/\/+$/, '');
 
   if (cleanPrimary === '/api' || cleanPrimary.endsWith('/api')) {
-    return `http://${currentHost}:8000`;
+    return `http://${currentHost}:9000`;
   }
   return '/api';
 }
 
 export function setApiUrl(url) {
+  const normalized = normalizeApiUrl(url);
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(API_URL_KEY, url);
+    localStorage.setItem(API_URL_KEY, normalized);
   }
+  return normalized;
 }
 
 function normalizeEndpoint(endpoint) {
@@ -55,11 +66,11 @@ function normalizeEndpoint(endpoint) {
 /**
  * Ping backend API to check if accessible
  */
-export async function checkApiHealth() {
-  let baseUrl = getApiUrl();
+export async function checkApiHealth(customUrl = null) {
+  let baseUrl = customUrl ? normalizeApiUrl(customUrl) : getApiUrl();
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5 seconds timeout
 
     let res;
     try {
@@ -68,6 +79,21 @@ export async function checkApiHealth() {
         method: 'GET',
         signal: controller.signal
       });
+
+      // Se retornou status >= 500 via proxy (/api), tenta fallback direto na porta 9000
+      if (!res.ok && res.status >= 500 && (baseUrl === '/api' || baseUrl.endsWith('/api'))) {
+        const fallbackUrl = getFallbackApiUrl(baseUrl);
+        if (fallbackUrl && fallbackUrl !== baseUrl) {
+          const fallbackRes = await fetch(`${fallbackUrl}/health`, {
+            method: 'GET',
+            signal: controller.signal
+          });
+          if (fallbackRes.ok || fallbackRes.status === 401 || fallbackRes.status === 403) {
+            res = fallbackRes;
+            baseUrl = fallbackUrl;
+          }
+        }
+      }
     } catch (primaryErr) {
       const fallbackUrl = getFallbackApiUrl(baseUrl);
       if (fallbackUrl && fallbackUrl !== baseUrl) {
@@ -99,7 +125,7 @@ export async function checkApiHealth() {
       return { online: true, mode: 'api', message: 'API Backend conectada com sucesso!' };
     }
 
-    return { online: false, mode: 'offline', message: `Servidor local respondeu com erro (${res.status}).` };
+    return { online: false, mode: 'offline', message: `Servidor respondeu com status (${res.status}).` };
   } catch {
     return { online: false, mode: 'offline', message: 'Não foi possível conectar à API Backend.' };
   }

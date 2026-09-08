@@ -3,6 +3,7 @@ import { LogOut, RefreshCw, ShieldCheck, Printer, Image, Server, Settings, Arrow
 import AppShell from './components/layout/AppShell';
 import TopBar from './components/layout/TopBar';
 import BottomTabBar from './components/layout/BottomTabBar';
+import AppDockNav from './components/layout/AppDockNav';
 import StatusCard from './components/auth/StatusCard';
 import Toast from './components/shared/Toast';
 import FAB from './components/launch/FAB';
@@ -42,7 +43,7 @@ function filterByPeriod(items, viewMode, year, month) {
 }
 
 export default function App() {
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'transactions' | 'analytics' | 'account'
 
@@ -67,19 +68,16 @@ export default function App() {
   const [ofertas, setOfertas] = useState([]);
   const [despesas, setDespesas] = useState([]);
 
-  // Sincroniza usuário e tema em eventos
+  // Sincroniza usuário em eventos
   useEffect(() => {
     const syncUser = () => setCurrentUser(getStoredUser());
-    const syncTheme = (e) => setTheme(e.detail || getStoredTheme());
 
     window.addEventListener('auth-change', syncUser);
     window.addEventListener('storage', syncUser);
-    window.addEventListener('theme-change', syncTheme);
 
     return () => {
       window.removeEventListener('auth-change', syncUser);
       window.removeEventListener('storage', syncUser);
-      window.removeEventListener('theme-change', syncTheme);
     };
   }, []);
 
@@ -401,10 +399,28 @@ export default function App() {
         />
       }
       navigation={
-        <BottomTabBar
-          activeTab={activeTab}
-          onChangeTab={setActiveTab}
-        />
+        <>
+          {/* Barra inferior nativa mobile (< 1024px) */}
+          <BottomTabBar
+            activeTab={activeTab}
+            onChangeTab={setActiveTab}
+          />
+
+          {/* Apple Style Dock para desktop (>= 1024px) */}
+          <AppDockNav
+            activeTab={activeTab}
+            onChangeTab={setActiveTab}
+            onNewLaunch={() => setIsLaunchOpen(true)}
+            onPrint={() => window.print()}
+            onManage={() => { window.location.href = '/gerenciar.html'; }}
+            toggleTheme={toggleTheme}
+            isDark={isDark}
+            onLogout={() => {
+              logout();
+              window.location.href = '/login.html';
+            }}
+          />
+        </>
       }
       toast={
         toast ? (
@@ -452,7 +468,7 @@ export default function App() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* TAB 1: HOME / DASHBOARD */}
         {activeTab === 'home' && (
-          <>
+          <div className="dashboard-content">
             <PeriodPicker
               viewMode={viewMode}
               onChangeViewMode={setViewMode}
@@ -463,35 +479,39 @@ export default function App() {
               availableYears={availableYears}
             />
 
-            <BalanceSummaryCard
-              totalEntradas={totalEntradas}
-              totalDespesas={totalDespesas}
-              saldoLiquido={saldoLiquido}
-              periodLabel={periodLabel}
-            />
+            <div className="dashboard-metrics-grid">
+              <BalanceSummaryCard
+                totalEntradas={totalEntradas}
+                totalDespesas={totalDespesas}
+                saldoLiquido={saldoLiquido}
+                periodLabel={periodLabel}
+              />
 
-            <QuickStatsRow
-              totalDizimos={totalDizimos}
-              countDizimos={dizimosFiltered.length}
-              totalOfertas={totalOfertas}
-              countOfertas={ofertasFiltered.length}
-              totalDespesas={totalDespesas}
-              countDespesas={despesasFiltered.length}
-            />
+              <QuickStatsRow
+                totalDizimos={totalDizimos}
+                countDizimos={dizimosFiltered.length}
+                totalOfertas={totalOfertas}
+                countOfertas={ofertasFiltered.length}
+                totalDespesas={totalDespesas}
+                countDespesas={despesasFiltered.length}
+              />
+            </div>
 
-            <MiniChartBar
-              despesas={despesasFiltered}
-              totalDespesas={totalDespesas}
-            />
+            <div className="dashboard-details-grid">
+              <MiniChartBar
+                despesas={despesasFiltered}
+                totalDespesas={totalDespesas}
+              />
 
-            <RecentTransactions
-              dizimos={dizimosFiltered}
-              ofertas={ofertasFiltered}
-              despesas={despesasFiltered}
-              membrosMap={membrosMap}
-              onViewAll={() => setActiveTab('transactions')}
-            />
-          </>
+              <RecentTransactions
+                dizimos={dizimosFiltered}
+                ofertas={ofertasFiltered}
+                despesas={despesasFiltered}
+                membrosMap={membrosMap}
+                onViewAll={() => setActiveTab('transactions')}
+              />
+            </div>
+          </div>
         )}
 
         {/* TAB 2: EXTRATO COMPLETO DE TRANSAÇÕES */}
@@ -518,7 +538,7 @@ export default function App() {
 
         {/* TAB 3: ANÁLISE E MÉTRICAS */}
         {activeTab === 'analytics' && (
-          <>
+          <div className="dashboard-content">
             <PeriodPicker
               viewMode={viewMode}
               onChangeViewMode={setViewMode}
@@ -542,7 +562,7 @@ export default function App() {
               despesas={despesasFiltered}
               totalDespesas={totalDespesas}
             />
-          </>
+          </div>
         )}
 
         {/* TAB 4: CONTA E PREFERÊNCIAS */}

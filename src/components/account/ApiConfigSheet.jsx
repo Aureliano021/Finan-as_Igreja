@@ -27,7 +27,7 @@ export default function ApiConfigSheet({
     setTesting(true);
     setHealthResult(null);
     try {
-      const res = await checkApiHealth();
+      const res = await checkApiHealth(apiUrl.trim());
       setHealthResult(res);
     } catch {
       setHealthResult({ online: false, message: 'Falha ao conectar com o servidor.' });
@@ -39,8 +39,9 @@ export default function ApiConfigSheet({
   const handleSave = (e) => {
     e.preventDefault();
     const cleanUrl = apiUrl.trim();
-    setApiUrl(cleanUrl);
-    if (onSuccess) onSuccess('URL da API atualizada com sucesso!');
+    const savedUrl = setApiUrl(cleanUrl);
+    setApiUrlState(savedUrl);
+    if (onSuccess) onSuccess(`URL da API salva: ${savedUrl}`);
     onClose();
   };
 

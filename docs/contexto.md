@@ -8,10 +8,22 @@ Este documento consolida a visão geral, regras de negócio, arquitetura técnic
 - **Instituição:** Igreja Metodista Wesleyana de Itupeva.
 - **Objetivo:** Controle financeiro eclesiástico transparente, rápido e confiável, permitindo lançamentos individuais e em lote pós-culto, relatórios para prestação de contas aos membros e assembleias, além de central administrativa para tesouraria e pastor presidente.
 - **Stack Tecnológico:**
-  - **Frontend:** React 19, Vite, Vanilla CSS modular (Design System próprio com variáveis CSS sem Tailwind).
+  - **Frontend:** React 19, Vite, Tailwind CSS v3 + CSS Modular (Design System Fintech Dark/Light).
   - **Ícones:** Lucide React.
   - **Exportação:** `html2canvas` (geração de imagens PNG em 2x retina) e folha de estilo para impressão A4.
-  - **Deploy:** Container Docker com Nginx multi-stage build.
+  - **Deploy & Infraestrutura de Produção (Servidor Autônomo Redmi Note 8):**
+    - A aplicação de produção opera de forma 100% autônoma em um smartphone **Xiaomi Redmi Note 8 (`ginkgo`)** dedicado atuando como mini-servidor local na igreja.
+    - **Sistema Operacional & Kernel:** Android 16 (LineageOS 23.2) com **Kernel Linux 4.14 customizado e compilado nativamente** contendo todas as flags ativas para Docker (`CONFIG_NAMESPACES`, `CONFIG_CGROUPS`, `CONFIG_SYSVIPC`, `CONFIG_POSIX_MQUEUE`, `CONFIG_OVERLAY_FS`).
+    - **Ambiente de Execução:** Debian Linux em `chroot` gerenciado via script de auto-boot do Magisk (`/data/adb/service.d/autostart_debian.sh`).
+    - **Orquestração Docker Compose (Modo Host):**
+      - `igreja_frontend`: Container Nginx com a build estática do React na porta 80 (com proxy reverso `/api/` direcionando internamente para a porta 8000).
+      - `igreja_backend`: Container Python com FastAPI na porta 8000.
+      - `igreja_postgres`: Container PostgreSQL 16 na porta 5432 (banco `bi_learning`).
+    - **IP do Servidor na Rede:** `http://192.168.1.83` (Web) e `http://192.168.1.83:8000/docs` (Swagger).
+    - *(Para o guia detalhado da compilação do Kernel e automações do Magisk, consulte [PLANO_KERNEL_DOCKER.md](file:///c:/Users/aurel/OneDrive/Documents/FinanciasIgreja/igreja-financas-fe/docs/PLANO_KERNEL_DOCKER.md)).*
+  - **Ambiente de Desenvolvimento Local (PC):**
+    - Frontend rodando via Vite Dev Server na porta 5173.
+    - Backend FastAPI executado localmente. Para aceitar requisições de outros dispositivos da rede (como testes no celular), foi configurada a regra de entrada no Firewall do Windows intitulada **`API Finanças Igreja`** na porta TCP **`9000`**.
 
 ---
 
