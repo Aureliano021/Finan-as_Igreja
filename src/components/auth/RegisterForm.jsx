@@ -37,8 +37,8 @@ export default function RegisterForm({
       return;
     }
 
-    if (!senha || senha.length < 4) {
-      onError('A senha deve conter no mínimo 4 caracteres.');
+    if (!senha || senha.length < 8) {
+      onError('A senha deve conter no mínimo 8 caracteres.');
       return;
     }
 
@@ -165,7 +165,7 @@ export default function RegisterForm({
             id="reg-pass"
             type="password"
             autoComplete="new-password"
-            placeholder="Mínimo 4 caracteres"
+            placeholder="Mínimo 8 caracteres"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             className="input font-mono"

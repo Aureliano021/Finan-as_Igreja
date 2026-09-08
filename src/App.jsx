@@ -594,23 +594,21 @@ export default function App() {
             <div className="card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => {
-                  const next = toggleTheme();
-                  setTheme(next);
-                }}
+                onClick={toggleTheme}
                 className="btn btn-panel"
                 style={{ justifyContent: 'space-between' }}
+                aria-label={`Alternar para ${isDark ? 'Modo Claro' : 'Modo Escuro'}`}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {theme === 'light' ? (
-                    <Moon size={16} className="text-blue-glow" />
+                  {isDark ? (
+                    <Sun size={16} style={{ color: '#fbbf24' }} />
                   ) : (
-                    <Sun size={16} style={{ color: '#ffb703' }} />
+                    <Moon size={16} style={{ color: '#6366f1' }} />
                   )}
                   Aparência do Sistema
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-                  {theme === 'light' ? 'Modo Claro' : 'Modo Escuro'}
+                <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                  {isDark ? 'Modo Escuro' : 'Modo Claro'}
                 </span>
               </button>
 
@@ -625,26 +623,6 @@ export default function App() {
                 </span>
                 <ArrowRight size={15} style={{ color: 'var(--muted)' }} />
               </a>
-
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="btn btn-panel"
-                style={{ justifyContent: 'space-between' }}
-                aria-label={`Alternar tema atual: ${isDark ? 'Modo Escuro' : 'Modo Claro'}`}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {isDark ? (
-                    <Sun size={16} style={{ color: '#fbbf24' }} />
-                  ) : (
-                    <Moon size={16} style={{ color: '#6366f1' }} />
-                  )}
-                  Aparência: <strong>{isDark ? 'Modo Escuro (Dark)' : 'Modo Claro (Light)'}</strong>
-                </span>
-                <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>
-                  Alternar ☀️/🌙
-                </span>
-              </button>
 
               <button
                 type="button"

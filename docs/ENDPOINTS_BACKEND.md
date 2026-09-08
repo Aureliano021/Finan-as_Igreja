@@ -1,6 +1,6 @@
 # 📡 Documentação Oficial dos Endpoints da API (Backend FastAPI)
 
-Esta documentação descreve todos os **18 endpoints** do backend (autenticação e operações CRUD para membros, despesas, dízimos e ofertas).
+Esta documentação descreve os **19 endpoints** do backend (health check, autenticação e operações CRUD para membros, despesas, dízimos e ofertas).
 
 ---
 
@@ -17,7 +17,22 @@ Content-Type: application/json
 
 ---
 
-## 🔑 1. Autenticação
+## 🩺 1. Health Check (Público)
+
+### `GET /health`
+Verifica se o servidor FastAPI está ativo e respondendo.
+
+- **Autenticação:** Não necessária.
+- **Resposta (JSON):**
+```json
+{
+  "status": "ok"
+}
+```
+
+---
+
+## 🔑 2. Autenticação
 
 ### `POST /auth/login`
 Autentica o usuário e retorna o token JWT.
@@ -33,14 +48,14 @@ Autentica o usuário e retorna o token JWT.
 ---
 
 ### `POST /auth/register`
-Cadastra um novo usuário no sistema.
+Cadastra um novo usuário no sistema (a senha deve ter no mínimo 8 caracteres).
 
 **Body (JSON):**
 ```json
 {
   "nome": "João da Silva",
   "email": "joao@email.com",
-  "senha": "123456"
+  "senha": "senhaSegura123"
 }
 ```
 
@@ -71,7 +86,7 @@ Cadastra um novo membro.
 
 ---
 
-### `PUT /membro/{membro_id}`
+### `PATCH /membro/{membro_id}` (ou `PUT`)
 Atualiza parcialmente um membro existente.
 
 **Body (JSON - Campos opcionais):**
@@ -98,7 +113,7 @@ Remove um membro cadastrado pelo ID.
 
 ---
 
-## 💸 3. Despesas
+## 💸 4. Despesas
 
 ### `GET /despesas`
 Lista todas as despesas registradas.
@@ -115,21 +130,21 @@ Registra uma nova despesa.
 {
   "nome": "Conta de energia",
   "data": "2026-08-05",
-  "valor": 250
+  "valor": 250.50
 }
 ```
 
 ---
 
-### `PUT /despesas/{despesas_id}`
-Atualiza uma despesa existente (todos os campos são obrigatórios).
+### `PATCH /despesas/{despesas_id}` (ou `PUT`)
+Atualiza uma despesa existente.
 
 **Body (JSON):**
 ```json
 {
   "nome": "Conta de energia atualizada",
   "data": "2026-08-05",
-  "valor": 300
+  "valor": 300.00
 }
 ```
 
@@ -142,7 +157,7 @@ Remove uma despesa registrada pelo ID.
 
 ---
 
-## 💰 4. Dízimos
+## 💰 5. Dízimos
 
 ### `GET /dizimos`
 Lista todos os dízimos lançados.
@@ -165,7 +180,7 @@ Lança um novo dízimo.
 
 ---
 
-### `PUT /dizimos/{dizimo_id}`
+### `PATCH /dizimos/{dizimo_id}` (ou `PUT`)
 Atualiza um dízimo existente (campos opcionais).
 
 **Body (JSON):**
@@ -189,7 +204,7 @@ Remove um dízimo lançado pelo ID.
 
 ---
 
-## 🎁 5. Ofertas
+## 🎁 6. Ofertas
 
 ### `GET /ofertas`
 Lista todas as ofertas lançadas.
@@ -211,8 +226,8 @@ Lança uma nova oferta.
 
 ---
 
-### `PUT /ofertas/{oferta_id}`
-Atualiza uma oferta existente (todos os campos são obrigatórios).
+### `PATCH /ofertas/{oferta_id}` (ou `PUT`)
+Atualiza uma oferta existente.
 
 **Body (JSON):**
 ```json
@@ -233,6 +248,7 @@ Remove uma oferta lançada pelo ID.
 
 ## 📊 Resumo de Endpoints
 
-Ao todo, são **18 endpoints**:
+Ao todo, são **19 endpoints**:
+- **1** de verificação de integridade (`/health`)
 - **2** de autenticação (`/auth/login`, `/auth/register`)
 - **16** de operações CRUD (`/membro`, `/despesas`, `/dizimos`, `/ofertas`)

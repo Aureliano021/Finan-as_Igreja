@@ -73,7 +73,7 @@ export default function EditRecordSheet({
         onError('Por favor, informe a descrição da despesa.');
         return;
       }
-      payload = { nome: nome.trim(), valor: Math.round(numVal), data };
+      payload = { nome: nome.trim(), valor: numVal, data };
     }
 
     setSubmitting(true);

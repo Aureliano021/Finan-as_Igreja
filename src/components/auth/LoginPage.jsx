@@ -14,7 +14,7 @@ import useTheme from '../../hooks/useTheme';
  * com verificação de status do servidor sob demanda.
  */
 export default function LoginPage() {
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [accessRestriction, setAccessRestriction] = useState(null); // { status, message, user }
@@ -74,7 +74,6 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: '100vh',
       minHeight: '100dvh',
       backgroundColor: 'var(--bg)',
       display: 'flex',

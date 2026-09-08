@@ -120,7 +120,9 @@ export default function MemberFormSheet({
 
         {/* Data de Nascimento */}
         <div className="form-group">
-          <label className="form-label" htmlFor="mem-nasc">Data de Nascimento (Opcional)</label>
+          <label className="form-label" htmlFor="mem-nasc">
+            Data de Nascimento {isEditing ? '(Opcional)' : ''}
+          </label>
           <div style={{ position: 'relative' }}>
             <Calendar
               size={16}
@@ -140,6 +142,7 @@ export default function MemberFormSheet({
               onChange={(e) => setDataNascimento(e.target.value)}
               className="input font-mono"
               style={{ paddingLeft: 38 }}
+              required={!isEditing}
             />
           </div>
         </div>

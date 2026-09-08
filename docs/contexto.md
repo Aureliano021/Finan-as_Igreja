@@ -35,6 +35,12 @@ O projeto adota uma identidade visual moderna estilo **Fintech Eclesiástica** c
 - **Textos de Interface e Formulários:** `Inter` (legibilidade e clareza).
 - **Valores Monetários, Datas e Badges:** `IBM Plex Mono` (precisão numérica e alinhamento em tabelas).
 
+### 📱💻 Arquitetura de Layout: Mobile-First e Desktop Unificado
+A interface adota a estratégia **Universal Responsive App Shell**:
+- **Experiência Mobile:** Ocupa 100% da viewport vertical e horizontal com suporte a safe areas (`env(safe-area-inset-*)`), navegação por barra fixa inferior (`bottom-tab-bar`), botão de ação flutuante (`fab-button`) e formulários deslizantes estilo gaveta (`BottomSheet`).
+- **Experiência Desktop:** Centraliza o fluxo em uma coluna otimizada de aplicativo com largura máxima de `720px` (`max-width: 720px; margin: 0 auto;`), padrão consagrado em web apps de alta produtividade (como Telegram Web e fintechs). Todas as ações, modais e gráficos funcionam com a mesma fluidez em qualquer resolução.
+- **Relatório e Impressão:** Ao acionar a impressão A4 (`@media print`), os limites da casca do app são desativados e o documento se expande na folha com cabeçalho oficial e tabelas completas.
+
 ---
 
 ## 3. 📱 Módulos e Páginas da Aplicação
@@ -115,24 +121,27 @@ Como medida de proteção contra ataques e economia operacional, o servidor da a
 
 | Método | Endpoint | Função |
 | :--- | :--- | :--- |
+| `GET` | `/health` | Health check público (retorna `{"status": "ok"}`). |
 | `POST` | `/auth/login` | Autenticação com e-mail e senha (retorna JWT e dados do usuário). |
-| `POST` | `/auth/register` | Criação de nova conta de usuário. |
+| `POST` | `/auth/register` | Criação de conta (mínimo 8 caracteres na senha). |
 | `GET` | `/membro` | Lista todos os membros cadastrados. |
-| `POST` | `/membro` | Cadastro de novo membro. |
-| `PUT` | `/membro/{id}` | Atualização de cadastro de membro. |
+| `POST` | `/membro` | Cadastro de novo membro (data de nascimento obrigatória). |
+| `PATCH` | `/membro/{id}` | Atualização parcial de cadastro de membro. |
 | `DELETE` | `/membro/{id}` | Exclusão de membro. |
 | `GET` | `/dizimos` | Lista todos os lançamentos de dízimos. |
 | `POST` | `/dizimos` | Lançamento individual ou em lote de dízimos. |
-| `PUT` | `/dizimos/{id}` | Edição de registro de dízimo. |
+| `PATCH` | `/dizimos/{id}` | Edição de registro de dízimo. |
 | `DELETE` | `/dizimos/{id}` | Exclusão de registro de dízimo. |
 | `GET` | `/ofertas` | Lista todos os lançamentos de ofertas. |
 | `POST` | `/ofertas` | Lançamento de ofertas. |
-| `PUT` | `/ofertas/{id}` | Edição de oferta. |
+| `PATCH` | `/ofertas/{id}` | Edição de oferta. |
 | `DELETE` | `/ofertas/{id}` | Exclusão de oferta. |
 | `GET` | `/despesas` | Lista todos os pagamentos e despesas. |
-| `POST` | `/despesas` | Lançamento de despesas. |
-| `PUT` | `/despesas/{id}` | Edição de despesa. |
+| `POST` | `/despesas` | Lançamento de despesas (suporte a valores decimais com centavos). |
+| `PATCH` | `/despesas/{id}` | Edição de despesa. |
 | `DELETE` | `/despesas/{id}` | Exclusão de despesa. |
+
+> **Observação de compatibilidade:** O frontend adota `PATCH` como método nativo de atualização em conformidade com as rotas `@router.patch(...)` do FastAPI, mantendo fallback inteligente bidirecional (`PATCH` ↔ `PUT`) caso necessário.
 
 ---
 
@@ -151,3 +160,27 @@ npm run build
 # Subir container Nginx via Docker Compose
 docker compose up -d --build
 ```
+
+---
+
+## 8. 🤖 Regras de Atuação da IA e Escopo de Desenvolvimento (Pair Programming)
+
+Este projeto de frontend (`igreja-financas-fe`) reside dentro da estrutura geral do projeto de gestão financeira da igreja, cujo diretório raiz/pai contém a aplicação backend em Python/FastAPI.
+
+Para garantir o alinhamento com a forma de aprendizado do desenvolvedor e a integridade da aplicação, as seguintes regras são **obrigatórias e inegociáveis**:
+
+### 🚫 1. Proibição Absoluta de Alterar o Backend
+- **A IA NUNCA deve criar, editar, alterar ou excluir arquivos do backend** (diretório pai `../` ou arquivos como `controller.py`, `main.py`, `service/`, `models/`, `router/`, `schemas/`, `security/`, `migrations/`, etc.).
+- **Motivo Pedagógico e de Controle:** O desenvolvedor é estudante de Engenharia de Software com foco em Backend e BI. Ele programa o backend manualmente para consolidar seu aprendizado (Python, FastAPI, SQLAlchemy, Alembic, PostgreSQL).
+- **Como a IA deve atuar em relação ao backend:**
+  - Se for necessário suporte ou esclarecimento sobre backend, a IA deve atuar estritamente como **tutora/revisora** (explicar conceitos, comparar com Java/Spring, sugerir boas práticas, pseudocódigo ou perguntas orientadoras), **sem nunca escrever ou alterar o código do backend diretamente**.
+
+### 🔌 2. Adaptação Estrita aos Contratos da API Existente
+- O frontend deve se adaptar **exclusivamente aos contratos, rotas e payloads definidos e documentados pelo backend** (vide Seção 6 deste arquivo e [ENDPOINTS_BACKEND.md](file:///c:/Users/aurel/OneDrive/Documents/FinanciasIgreja/igreja-financas-fe/docs/ENDPOINTS_BACKEND.md)).
+- O frontend não deve supor nem exigir alterações no backend; ele deve consumir as APIs existentes tratando os tipos, datas no formato `YYYY-MM-DD`, autenticação via `Authorization: Bearer <token>` e respostas de erro/sucesso.
+
+### 🎨 3. Preservação da Identidade Visual e Arquitetura do Frontend
+- **Design System Vanilla:** Manter o CSS modular próprio com variáveis nativas (sem introduzir Tailwind CSS).
+- **Tipografia e Cores:** Seguir rigorosamente `Space Grotesk`, `Inter`, `IBM Plex Mono` e os temas Dark/Light mode.
+- **Detecção Sob Demanda:** Manter a proteção de verificação de servidor offline/online com bloqueio de interface quando o backend estiver desligado.
+

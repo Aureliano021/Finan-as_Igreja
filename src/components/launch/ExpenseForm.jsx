@@ -57,7 +57,7 @@ export default function ExpenseForm({
     try {
       const res = await createRecord('despesas', {
         nome: cleanNome,
-        valor: Math.round(numVal),
+        valor: numVal,
         data: singleData
       });
 
@@ -126,7 +126,7 @@ export default function ExpenseForm({
       try {
         const res = await createRecord('despesas', {
           nome: row.nome.trim(),
-          valor: Math.round(parseFloat(String(row.valor).replace(',', '.'))),
+          valor: parseFloat(String(row.valor).replace(',', '.')),
           data: row.data || batchDate
         });
 

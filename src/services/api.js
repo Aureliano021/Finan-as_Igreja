@@ -61,41 +61,46 @@ export async function checkApiHealth() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5 seconds timeout
 
-    const headers = {};
-    const token = getStoredToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
     let res;
     try {
-      res = await fetch(`${baseUrl}/membro`, {
+      // Prioriza endpoint nativo /health do backend
+      res = await fetch(`${baseUrl}/health`, {
         method: 'GET',
-        headers,
         signal: controller.signal
       });
     } catch (primaryErr) {
       const fallbackUrl = getFallbackApiUrl(baseUrl);
       if (fallbackUrl && fallbackUrl !== baseUrl) {
-        res = await fetch(`${fallbackUrl}/membro`, {
-          method: 'GET',
-          headers,
-          signal: controller.signal
-        });
-        baseUrl = fallbackUrl;
+        try {
+          res = await fetch(`${fallbackUrl}/health`, {
+            method: 'GET',
+            signal: controller.signal
+          });
+          baseUrl = fallbackUrl;
+        } catch {
+          // Fallback para /membro caso /health não esteja disponível
+          const headers = {};
+          const token = getStoredToken();
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          res = await fetch(`${baseUrl}/membro`, {
+            method: 'GET',
+            headers,
+            signal: controller.signal
+          });
+        }
       } else {
         throw primaryErr;
       }
     }
     clearTimeout(timeoutId);
 
-    // 200 OK, 401 Unauthorized or 403 Forbidden all mean the backend API is online and responding
+    // 200 OK, 401 Unauthorized ou 403 Forbidden indicam que o servidor backend está online e respondendo
     if (res.ok || res.status === 401 || res.status === 403) {
       return { online: true, mode: 'api', message: 'API Backend conectada com sucesso!' };
     }
 
     return { online: false, mode: 'offline', message: `Servidor local respondeu com erro (${res.status}).` };
-  } catch (err) {
+  } catch {
     return { online: false, mode: 'offline', message: 'Não foi possível conectar à API Backend.' };
   }
 }
@@ -301,6 +306,21 @@ async function executeMutation(endpoint, method, id = null, payload = null) {
     }
   }
 
+  // Método HTTP 405 (Method Not Allowed) Fallback (PATCH <-> PUT)
+  if (res && res.status === 405) {
+    const altMethod = method === 'PATCH' ? 'PUT' : method === 'PUT' ? 'PATCH' : null;
+    if (altMethod) {
+      console.warn(`[Mutation 405] Tentando método alternativo ${altMethod} para ${targetEp}...`);
+      const altOpts = { ...opts, method: altMethod };
+      const currentBase = res.url ? new URL(res.url).origin : baseUrl;
+      const altUrl = `${currentBase}/${buildPath(targetEp)}`;
+      const altRes = await fetch(altUrl, altOpts).catch(() => null);
+      if (altRes && (altRes.ok || altRes.status === 200 || altRes.status === 201 || altRes.status === 204)) {
+        res = altRes;
+      }
+    }
+  }
+
   // Singular / Plural 404 Endpoint Fallback
   if (res && res.status === 404) {
     console.warn(`[Mutation 404] ${method} ${primaryUrl} - tentando variação de endpoint...`);
@@ -319,13 +339,13 @@ async function executeMutation(endpoint, method, id = null, payload = null) {
       const altUrl = `${currentBase}/${buildPath(altEp)}`;
       console.info(`[Mutation 404 Fallback] Tentando ${method} ${altUrl}`);
       const altRes = await fetch(altUrl, opts).catch(() => null);
-      if (altRes && (altRes.ok || altRes.status === 201 || altRes.status === 204)) {
+      if (altRes && (altRes.ok || altRes.status === 200 || altRes.status === 201 || altRes.status === 204)) {
         res = altRes;
       }
     }
   }
 
-  if (res.ok || res.status === 201 || res.status === 204) {
+  if (res.ok || res.status === 200 || res.status === 201 || res.status === 204) {
     const data = await res.json().catch(() => payload);
     console.log(`[Mutation Success] ${method} ${endpoint}:`, data);
     return { success: true, status: res.status, data };
@@ -363,10 +383,10 @@ export async function createRecord(endpoint, payload) {
 }
 
 /**
- * Generic helper to update a record via PUT
+ * Generic helper to update a record via PATCH (FastAPI standard)
  */
 export async function updateRecord(endpoint, id, payload) {
-  return executeMutation(endpoint, 'PUT', id, payload);
+  return executeMutation(endpoint, 'PATCH', id, payload);
 }
 
 /**

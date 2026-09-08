@@ -13,7 +13,7 @@ import LaunchBottomSheet from '../launch/LaunchBottomSheet';
 import ApiConfigSheet from '../account/ApiConfigSheet';
 
 import { fetchAllFinancialData, deleteRecord, checkApiHealth } from '../../services/api';
-import { getStoredUser, getUserStatus } from '../../services/auth';
+import { getStoredUser } from '../../services/auth';
 import { formatCurrency, formatDateBR, getRecordDate, getRecordValue, parseDateParts, MONTHS } from '../../services/utils';
 
 /**
