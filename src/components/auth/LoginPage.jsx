@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShieldCheck, LogIn, UserPlus, AlertCircle, WifiOff, RefreshCw, MessageCircle, Settings, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { ShieldCheck, LogIn, UserPlus, AlertCircle, WifiOff, RefreshCw, MessageSquare, Settings, CheckCircle2, Sun, Moon } from 'lucide-react';
 import { getStoredUser, getUserStatus } from '../../services/auth';
 import { checkApiHealth } from '../../services/api';
 import LoginForm from './LoginForm';
@@ -24,8 +24,6 @@ export default function LoginPage() {
   const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
   const [isRetryingServer, setIsRetryingServer] = useState(false);
   const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
-
-  const adminPhone = '5511999999999';
 
   // Verifica o status do servidor backend
   const checkServer = useCallback(async () => {
@@ -67,10 +65,6 @@ export default function LoginPage() {
     setMode(newMode);
     setErrorMessage('');
   };
-
-  const whatsappOnDemandMessage = encodeURIComponent(
-    'Olá Administrador! Estou na tela de login do aplicativo Finanças IMW e o servidor está offline. Poderia ligar o servidor para que eu possa acessar?'
-  );
 
   return (
     <div style={{
@@ -256,35 +250,52 @@ export default function LoginPage() {
               Por segurança contra acessos indevidos e economia, o servidor permanece desligado quando não está em uso. Peça ao administrador para ligá-lo antes de entrar.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <a
-                href={`https://wa.me/${adminPhone}?text=${whatsappOnDemandMessage}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary"
-                style={{
-                  padding: '12px 18px',
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  fontWeight: 600
-                }}
-              >
-                <MessageCircle size={17} />
-                Pedir no WhatsApp para Ligar
-              </a>
+            {/* Card de Orientação e Segurança */}
+            <div style={{
+              background: 'rgba(230, 57, 70, 0.05)',
+              border: '1px solid rgba(230, 57, 70, 0.2)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '14px 16px',
+              marginBottom: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              textAlign: 'left',
+              lineHeight: 1.45
+            }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--red-bg)',
+                border: '1px solid var(--red-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <WifiOff size={18} className="text-red-glow" />
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text)', marginBottom: 2 }}>
+                  Servidor em Repouso
+                </div>
+                <div style={{ color: 'var(--muted)', fontSize: '0.79rem' }}>
+                  Por economia e segurança, o servidor fica desligado quando não está em uso. Peça ao Aureliano pelo WhatsApp para ligá-lo.
+                </div>
+              </div>
+            </div>
 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
                 type="button"
                 onClick={() => {
                   handleRecheckServer();
                 }}
                 disabled={isRetryingServer}
-                className="btn btn-panel"
+                className="btn btn-primary"
                 style={{
-                  padding: '11px 16px',
+                  padding: '12px 18px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -293,7 +304,7 @@ export default function LoginPage() {
                 }}
               >
                 <RefreshCw size={15} className={isRetryingServer ? 'animate-spin text-blue' : ''} />
-                {isRetryingServer ? 'Verificando conexão…' : 'Recarregar / Testar Conexão'}
+                {isRetryingServer ? 'Verificando status…' : 'Já ligou? Testar Conexão'}
               </button>
 
               <div style={{

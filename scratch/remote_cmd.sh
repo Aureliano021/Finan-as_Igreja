@@ -1,0 +1,1 @@
+su -c 'chroot /data/local/tmp/chrootDebian /bin/bash -c "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:\$PATH; docker inspect igreja_postgres --format \"{{json .Config.Env}}\""'
