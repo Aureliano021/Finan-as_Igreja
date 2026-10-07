@@ -29,6 +29,7 @@ import EscalaFormSheet from './EscalaFormSheet';
 import CargoFormSheet from './CargoFormSheet';
 import LaunchBottomSheet from '../launch/LaunchBottomSheet';
 import ApiConfigSheet from '../account/ApiConfigSheet';
+import NextCultoCard from '../home/NextCultoCard';
 
 import { fetchAllFinancialData, deleteRecord, checkApiHealth } from '../../services/api';
 import {
@@ -1026,6 +1027,13 @@ export default function DataEditorPage() {
         {/* TAB 5: CULTOS / ESCALAS */}
         {activeTab === 'escalas' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Destaque do Próximo Culto */}
+            <NextCultoCard
+              escalas={escalas}
+              membrosMap={membrosMap}
+              showManageButton={false}
+            />
+
             {filteredEscalas.map((escala) => {
               const descObj = deserializeEscalaDescricao(escala.descricao);
               const dataFormatada = escala.data ? formatDateBR(escala.data) : 'Data a definir';

@@ -20,8 +20,10 @@ import TransactionsList from './components/transactions/TransactionsList';
 import IncomeVsExpense from './components/analytics/IncomeVsExpense';
 import CategoryBreakdown from './components/analytics/CategoryBreakdown';
 import PeriodPicker from './components/shared/PeriodPicker';
+import NextCultoCard from './components/home/NextCultoCard';
 
 import { fetchAllFinancialData, checkApiHealth } from './services/api';
+import { fetchEscalas } from './services/cultos';
 import { getStoredUser, getUserStatus, setAuth, getStoredToken, logout } from './services/auth';
 import { getRecordDate, getRecordValue, parseDateParts, MONTHS, findLatestRecordPeriod } from './services/utils';
 import { exportReportCardToPng } from './utils/exportUtils';
@@ -67,6 +69,7 @@ export default function App() {
   const [dizimos, setDizimos] = useState([]);
   const [ofertas, setOfertas] = useState([]);
   const [despesas, setDespesas] = useState([]);
+  const [escalas, setEscalas] = useState([]);
 
   // Sincroniza usuário em eventos
   useEffect(() => {
@@ -94,7 +97,10 @@ export default function App() {
     }, 6000);
 
     try {
-      const data = await fetchAllFinancialData();
+      const [data, loadedEscalas] = await Promise.all([
+        fetchAllFinancialData(),
+        fetchEscalas().catch(() => [])
+      ]);
       const loadedMembros = Array.isArray(data?.membros) ? data.membros : [];
       const loadedDizimos = Array.isArray(data?.dizimos) ? data.dizimos : [];
       const loadedOfertas = Array.isArray(data?.ofertas) ? data.ofertas : [];
@@ -104,6 +110,7 @@ export default function App() {
       setDizimos(loadedDizimos);
       setOfertas(loadedOfertas);
       setDespesas(loadedDespesas);
+      setEscalas(Array.isArray(loadedEscalas) ? loadedEscalas : []);
 
       // Ao carregar dados com sucesso na primeira vez, define dinamicamente o último mês com registros
       if (!hasAutoSetPeriodRef.current && (data?.status === 'online' || loadedDizimos.length > 0 || loadedOfertas.length > 0 || loadedDespesas.length > 0)) {
@@ -469,6 +476,15 @@ export default function App() {
         {/* TAB 1: HOME / DASHBOARD */}
         {activeTab === 'home' && (
           <div className="dashboard-content">
+            {/* Card Destaque: Próximo Culto e Escala Litúrgica */}
+            <NextCultoCard
+              escalas={escalas}
+              membrosMap={membrosMap}
+              onManageCultos={() => {
+                window.location.href = '/gerenciar.html';
+              }}
+            />
+
             <PeriodPicker
               viewMode={viewMode}
               onChangeViewMode={setViewMode}
