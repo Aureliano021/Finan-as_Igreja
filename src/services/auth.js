@@ -4,11 +4,36 @@ const AUTH_TOKEN_KEY = 'igreja_auth_token';
 const AUTH_USER_KEY = 'igreja_auth_user';
 
 /**
- * Get stored JWT auth token
+ * Get stored JWT auth token (sanitizado e padronizado sem aspas ou prefixo Bearer duplicado)
  */
 export function getStoredToken() {
   if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+
+  let raw = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!raw || raw === 'null' || raw === 'undefined') {
+    raw = localStorage.getItem('token') ||
+          localStorage.getItem('access_token') ||
+          localStorage.getItem('jwt') ||
+          (typeof sessionStorage !== 'undefined'
+            ? (sessionStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem('token') || sessionStorage.getItem('access_token'))
+            : null);
+  }
+
+  if (!raw || raw === 'null' || raw === 'undefined') return null;
+
+  let clean = String(raw).trim();
+  // Se o token foi salvo envolto por aspas duplas (ex: via JSON.stringify)
+  if (clean.startsWith('"') && clean.endsWith('"') && clean.length > 2) {
+    try {
+      clean = JSON.parse(clean);
+    } catch {
+      clean = clean.slice(1, -1);
+    }
+  }
+
+  // Remove prefixo "Bearer " caso já esteja presente para padronizar
+  clean = clean.replace(/^Bearer\s+/i, '').trim();
+  return clean || null;
 }
 
 /**

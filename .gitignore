@@ -33,4 +33,5 @@ dist-ssr
 *.p12
 credentials.json
 secrets.json
+scratch/
 

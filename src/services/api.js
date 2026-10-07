@@ -135,12 +135,15 @@ export async function checkApiHealth(customUrl = null) {
  * Helper to fetch single endpoint safely catching CORS and network errors
  * Uses a 3.5-second timeout to avoid blocking Promise.all indefinitely when offline
  */
-async function safeFetchJson(url) {
+export async function safeFetchJson(url) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout
   
   try {
-    const headers = {};
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
     const token = getStoredToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -193,10 +196,13 @@ async function safeFetchJson(url) {
         if (json.id != null || json.valor != null || json.nome != null) {
           return [json];
         }
+
+        // Retorna o objeto diretamente (ex: { preletor, dirigente, cantor, musico })
+        return json;
       }
       return [];
     }
-  } catch (e) {
+  } catch {
     return null;
   } finally {
     clearTimeout(timeoutId);
@@ -295,11 +301,14 @@ export async function fetchAllFinancialData() {
 /**
  * Shared mutation runner handling primary & fallback URLs, singular/plural endpoints, and errors
  */
-async function executeMutation(endpoint, method, id = null, payload = null) {
+export async function executeMutation(endpoint, method, id = null, payload = null) {
   const baseUrl = getApiUrl();
   const fallbackUrl = getFallbackApiUrl(baseUrl);
   const token = getStoredToken();
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const targetEp = normalizeEndpoint(endpoint);
@@ -359,6 +368,10 @@ async function executeMutation(endpoint, method, id = null, payload = null) {
     else if (targetEp === 'despesa') altEp = 'despesas';
     else if (targetEp === 'membro') altEp = 'membros';
     else if (targetEp === 'membros') altEp = 'membro';
+    else if (targetEp === 'escala') altEp = 'escalas';
+    else if (targetEp === 'escalas') altEp = 'escala';
+    else if (targetEp === 'cargos') altEp = 'cargo';
+    else if (targetEp === 'cargo') altEp = 'cargos';
 
     if (altEp) {
       const currentBase = res.url ? new URL(res.url).origin : baseUrl;
@@ -420,4 +433,11 @@ export async function updateRecord(endpoint, id, payload) {
  */
 export async function deleteRecord(endpoint, id) {
   return executeMutation(endpoint, 'DELETE', id, null);
+}
+
+/**
+ * Generic helper to update a record via PUT
+ */
+export async function updateRecordPut(endpoint, id, payload) {
+  return executeMutation(endpoint, 'PUT', id, payload);
 }

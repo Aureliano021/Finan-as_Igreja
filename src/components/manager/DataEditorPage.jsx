@@ -1,5 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Users, HeartHandshake, Gift, CreditCard, Plus, Search, Edit2, Trash2, X } from 'lucide-react';
+import {
+  Users,
+  HeartHandshake,
+  Gift,
+  CreditCard,
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  X,
+  Sparkles,
+  ShieldCheck,
+  Music,
+  Mic,
+  BookOpen,
+  Guitar
+} from 'lucide-react';
 import AppShell from '../layout/AppShell';
 import TopBar from '../layout/TopBar';
 import Badge from '../shared/Badge';
@@ -9,10 +25,20 @@ import PeriodPicker from '../shared/PeriodPicker';
 import ConfirmSheet from '../shared/ConfirmSheet';
 import MemberFormSheet from './MemberFormSheet';
 import EditRecordSheet from './EditRecordSheet';
+import EscalaFormSheet from './EscalaFormSheet';
+import CargoFormSheet from './CargoFormSheet';
 import LaunchBottomSheet from '../launch/LaunchBottomSheet';
 import ApiConfigSheet from '../account/ApiConfigSheet';
 
 import { fetchAllFinancialData, deleteRecord, checkApiHealth } from '../../services/api';
+import {
+  fetchEscalas,
+  fetchCargos,
+  deleteEscala,
+  deleteCargo,
+  canAccessCultos,
+  deserializeEscalaDescricao
+} from '../../services/cultos';
 import { getStoredUser } from '../../services/auth';
 import { formatCurrency, formatDateBR, getRecordDate, getRecordValue, parseDateParts, MONTHS } from '../../services/utils';
 
@@ -34,7 +60,7 @@ function filterByPeriod(items, viewMode, year, month) {
 
 export default function DataEditorPage() {
   const [currentUser] = useState(() => getStoredUser());
-  const [activeTab, setActiveTab] = useState('membros'); // 'membros' | 'dizimos' | 'ofertas' | 'despesas'
+  const [activeTab, setActiveTab] = useState('membros'); // 'membros' | 'dizimos' | 'ofertas' | 'despesas' | 'escalas' | 'cargos'
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ status: 'online', message: '' });
@@ -51,6 +77,8 @@ export default function DataEditorPage() {
   const [dizimos, setDizimos] = useState([]);
   const [ofertas, setOfertas] = useState([]);
   const [despesas, setDespesas] = useState([]);
+  const [escalas, setEscalas] = useState([]);
+  const [cargos, setCargos] = useState([]);
 
   // Modais e Sheets
   const [isMemberSheetOpen, setIsMemberSheetOpen] = useState(false);
@@ -59,6 +87,12 @@ export default function DataEditorPage() {
   const [isEditRecordOpen, setIsEditRecordOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [editingRecordType, setEditingRecordType] = useState('dizimos');
+
+  const [isEscalaSheetOpen, setIsEscalaSheetOpen] = useState(false);
+  const [editingEscala, setEditingEscala] = useState(null);
+
+  const [isCargoSheetOpen, setIsCargoSheetOpen] = useState(false);
+  const [editingCargo, setEditingCargo] = useState(null);
 
   const [isCreateLaunchOpen, setIsCreateLaunchOpen] = useState(false);
 
@@ -70,11 +104,19 @@ export default function DataEditorPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchAllFinancialData();
+      const [data, loadedEscalas, loadedCargos] = await Promise.all([
+        fetchAllFinancialData(),
+        fetchEscalas().catch(() => []),
+        fetchCargos().catch(() => [])
+      ]);
+
       setMembros(Array.isArray(data?.membros) ? data.membros : []);
       setDizimos(Array.isArray(data?.dizimos) ? data.dizimos : []);
       setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
       setDespesas(Array.isArray(data?.despesas) ? data.despesas : []);
+      setEscalas(Array.isArray(loadedEscalas) ? loadedEscalas : []);
+      setCargos(Array.isArray(loadedCargos) ? loadedCargos : []);
+
       setConnectionStatus({
         status: data?.status || 'offline',
         message: data?.message || ''
@@ -234,6 +276,44 @@ export default function DataEditorPage() {
     });
   }, [despesasInPeriod, searchTerm]);
 
+  // Filtragem de Escalas
+  const filteredEscalas = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const sorted = [...escalas].sort((a, b) => {
+      const dateA = a.data ? new Date(a.data) : new Date(0);
+      const dateB = b.data ? new Date(b.data) : new Date(0);
+      return dateB - dateA;
+    });
+
+    if (!term) return sorted;
+
+    return sorted.filter((escala) => {
+      const descObj = deserializeEscalaDescricao(escala.descricao);
+      const dataStr = escala.data ? formatDateBR(escala.data) : '';
+      const rawData = escala.data || '';
+      const tituloMatch = (descObj.titulo || '').toLowerCase().includes(term);
+      const dataMatch = dataStr.includes(term) || rawData.includes(term);
+      const obsMatch = (descObj.observacoes || '').toLowerCase().includes(term);
+      const musicMatch = Array.isArray(descObj.louvores) && descObj.louvores.some(l => l.toLowerCase().includes(term));
+      const teamMatch = Array.isArray(escala.itens) && escala.itens.some(it => {
+        const m = membrosMap[it.membro_id];
+        return m && (m.nome || '').toLowerCase().includes(term);
+      });
+      return tituloMatch || dataMatch || obsMatch || musicMatch || teamMatch;
+    });
+  }, [escalas, searchTerm, membrosMap]);
+
+  // Filtragem de Cargos
+  const filteredCargos = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return cargos;
+    return cargos.filter((c) => {
+      const member = membrosMap[c.membro_id];
+      const memberName = member?.nome || '';
+      return memberName.toLowerCase().includes(term);
+    });
+  }, [cargos, searchTerm, membrosMap]);
+
   // Nome do período formatado
   const periodLabel = useMemo(() => {
     if (viewMode === 'all') return 'Todos os lançamentos';
@@ -253,23 +333,45 @@ export default function DataEditorPage() {
     setIsDeleting(true);
 
     try {
-      const endpoint = itemToDelete.type === 'membro'
-        ? 'membro'
-        : itemToDelete.type === 'dizimos'
-        ? 'dizimos'
-        : itemToDelete.type === 'ofertas'
-        ? 'ofertas'
-        : 'despesas';
-
-      const res = await deleteRecord(endpoint, itemToDelete.id);
-
-      if (res.success) {
-        setToast({ type: 'success', message: `${itemToDelete.label} excluído com sucesso!` });
-        setIsDeleteOpen(false);
-        setItemToDelete(null);
-        loadData();
+      if (itemToDelete.type === 'escala') {
+        const res = await deleteEscala(itemToDelete.id);
+        if (res.success) {
+          setToast({ type: 'success', message: `${itemToDelete.label} excluído com sucesso!` });
+          setIsDeleteOpen(false);
+          setItemToDelete(null);
+          loadData();
+        } else {
+          setToast({ type: 'error', message: res.message || 'Erro ao excluir escala.' });
+        }
+      } else if (itemToDelete.type === 'cargo') {
+        const res = await deleteCargo(itemToDelete.id);
+        if (res.success) {
+          setToast({ type: 'success', message: `${itemToDelete.label} excluído com sucesso!` });
+          setIsDeleteOpen(false);
+          setItemToDelete(null);
+          loadData();
+        } else {
+          setToast({ type: 'error', message: res.message || 'Erro ao excluir registro de cargos.' });
+        }
       } else {
-        setToast({ type: 'error', message: res.message || 'Erro ao excluir registro.' });
+        const endpoint = itemToDelete.type === 'membro'
+          ? 'membro'
+          : itemToDelete.type === 'dizimos'
+          ? 'dizimos'
+          : itemToDelete.type === 'ofertas'
+          ? 'ofertas'
+          : 'despesas';
+
+        const res = await deleteRecord(endpoint, itemToDelete.id);
+
+        if (res.success) {
+          setToast({ type: 'success', message: `${itemToDelete.label} excluído com sucesso!` });
+          setIsDeleteOpen(false);
+          setItemToDelete(null);
+          loadData();
+        } else {
+          setToast({ type: 'error', message: res.message || 'Erro ao excluir registro.' });
+        }
       }
     } catch {
       setToast({ type: 'error', message: 'Falha na conexão com o servidor.' });
@@ -289,6 +391,23 @@ export default function DataEditorPage() {
       setIsEditRecordOpen(true);
     }
   };
+
+  // Verificação de acesso e abas disponíveis
+  const hasCultosAccess = useMemo(() => canAccessCultos(currentUser, cargos), [currentUser, cargos]);
+
+  const availableTabs = useMemo(() => {
+    const list = [
+      { id: 'membros', label: 'Membros', icon: Users, count: membros.length },
+      { id: 'dizimos', label: 'Dízimos', icon: HeartHandshake, count: dizimosInPeriod.length },
+      { id: 'ofertas', label: 'Ofertas', icon: Gift, count: ofertasInPeriod.length },
+      { id: 'despesas', label: 'Despesas', icon: CreditCard, count: despesasInPeriod.length }
+    ];
+    if (hasCultosAccess) {
+      list.push({ id: 'escalas', label: 'Cultos / Escala', icon: Sparkles, count: escalas.length });
+      list.push({ id: 'cargos', label: 'Cargos', icon: ShieldCheck, count: cargos.length });
+    }
+    return list;
+  }, [membros.length, dizimosInPeriod.length, ofertasInPeriod.length, despesasInPeriod.length, hasCultosAccess, escalas.length, cargos.length]);
 
   // Checagens de acesso e conectividade
   const isUnauth = !currentUser || connectionStatus.status === 'unauthenticated';
@@ -424,7 +543,41 @@ export default function DataEditorPage() {
             onError={(msg) => setToast({ type: 'error', message: msg })}
           />
 
-          {/* Sheet de Criação Geral */}
+          {/* Sheet de Cultos / Escalas */}
+          <EscalaFormSheet
+            isOpen={isEscalaSheetOpen}
+            onClose={() => {
+              setIsEscalaSheetOpen(false);
+              setEditingEscala(null);
+            }}
+            initialData={editingEscala}
+            membros={membros}
+            cargos={cargos}
+            onSuccess={(msg) => {
+              setToast({ type: 'success', message: msg });
+              loadData();
+            }}
+            onError={(msg) => setToast({ type: 'error', message: msg })}
+          />
+
+          {/* Sheet de Cargos */}
+          <CargoFormSheet
+            isOpen={isCargoSheetOpen}
+            onClose={() => {
+              setIsCargoSheetOpen(false);
+              setEditingCargo(null);
+            }}
+            initialData={editingCargo}
+            membros={membros}
+            cargosExistentes={cargos}
+            onSuccess={(msg) => {
+              setToast({ type: 'success', message: msg });
+              loadData();
+            }}
+            onError={(msg) => setToast({ type: 'error', message: msg })}
+          />
+
+          {/* Sheet de Criação Geral (Lançamentos Financeiros) */}
           <LaunchBottomSheet
             isOpen={isCreateLaunchOpen}
             onClose={() => setIsCreateLaunchOpen(false)}
@@ -453,18 +606,15 @@ export default function DataEditorPage() {
         {/* Tabs de Seleção de Entidade */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))`,
           background: 'var(--panel)',
           border: '1px solid var(--panel-line)',
           borderRadius: 'var(--radius-sm)',
-          padding: 3
+          padding: 3,
+          gap: 2,
+          overflowX: 'auto'
         }}>
-          {[
-            { id: 'membros', label: 'Membros', icon: Users, count: membros.length },
-            { id: 'dizimos', label: 'Dízimos', icon: HeartHandshake, count: dizimosInPeriod.length },
-            { id: 'ofertas', label: 'Ofertas', icon: Gift, count: ofertasInPeriod.length },
-            { id: 'despesas', label: 'Despesas', icon: CreditCard, count: despesasInPeriod.length }
-          ].map((tab) => {
+          {availableTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
 
@@ -487,14 +637,17 @@ export default function DataEditorPage() {
                   background: isActive ? 'var(--blue-bg)' : 'transparent',
                   color: isActive ? 'var(--blue-glow)' : 'var(--muted)',
                   fontFamily: 'var(--font-body)',
-                  fontSize: '0.74rem',
+                  fontSize: '0.72rem',
                   fontWeight: isActive ? 600 : 500,
                   cursor: 'pointer',
-                  transition: 'all var(--transition-fast)'
+                  transition: 'all var(--transition-fast)',
+                  minWidth: '54px'
                 }}
               >
                 <Icon size={16} />
-                <span>{tab.label}</span>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                  {tab.label}
+                </span>
                 <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', opacity: 0.8 }}>
                   ({tab.count})
                 </span>
@@ -503,8 +656,8 @@ export default function DataEditorPage() {
           })}
         </div>
 
-        {/* Seletor de Período (para abas financeiras) */}
-        {activeTab !== 'membros' && (
+        {/* Seletor de Período (apenas para abas financeiras) */}
+        {(activeTab === 'dizimos' || activeTab === 'ofertas' || activeTab === 'despesas') && (
           <PeriodPicker
             viewMode={viewMode}
             onChangeViewMode={setViewMode}
@@ -532,12 +685,24 @@ export default function DataEditorPage() {
             {activeTab === 'dizimos' && `${filteredDizimos.length} dízimos em ${periodLabel}`}
             {activeTab === 'ofertas' && `${filteredOfertas.length} ofertas em ${periodLabel}`}
             {activeTab === 'despesas' && `${filteredDespesas.length} despesas em ${periodLabel}`}
+            {activeTab === 'escalas' && `${filteredEscalas.length} cultos cadastrados`}
+            {activeTab === 'cargos' && `${filteredCargos.length} membros com funções atribuídas`}
           </span>
 
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: activeTab === 'despesas' ? 'var(--red-glow)' : 'var(--blue-glow)' }}>
             {activeTab === 'dizimos' && formatCurrency(totalDizimosPeriodo)}
             {activeTab === 'ofertas' && formatCurrency(totalOfertasPeriodo)}
             {activeTab === 'despesas' && formatCurrency(totalDespesasPeriodo)}
+            {activeTab === 'escalas' && (
+              <span style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 500 }}>
+                🎵 Playbacks integrados
+              </span>
+            )}
+            {activeTab === 'cargos' && (
+              <span style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 500 }}>
+                Aptidões ministeriais
+              </span>
+            )}
           </span>
         </div>
 
@@ -574,6 +739,12 @@ export default function DataEditorPage() {
               if (activeTab === 'membros') {
                 setEditingMember(null);
                 setIsMemberSheetOpen(true);
+              } else if (activeTab === 'escalas') {
+                setEditingEscala(null);
+                setIsEscalaSheetOpen(true);
+              } else if (activeTab === 'cargos') {
+                setEditingCargo(null);
+                setIsCargoSheetOpen(true);
               } else {
                 setIsCreateLaunchOpen(true);
               }
@@ -582,7 +753,12 @@ export default function DataEditorPage() {
             style={{ whiteSpace: 'nowrap', padding: '9px 14px' }}
           >
             <Plus size={15} />
-            Novo
+            <span>
+              {activeTab === 'membros' && 'Novo Membro'}
+              {activeTab === 'escalas' && 'Novo Culto'}
+              {activeTab === 'cargos' && 'Atribuir Cargos'}
+              {activeTab !== 'membros' && activeTab !== 'escalas' && activeTab !== 'cargos' && 'Novo'}
+            </span>
           </button>
         </div>
 
@@ -842,6 +1018,287 @@ export default function DataEditorPage() {
             {filteredDespesas.length === 0 && (
               <div className="card" style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--muted)' }}>
                 Nenhuma despesa no período ({periodLabel}).
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: CULTOS / ESCALAS */}
+        {activeTab === 'escalas' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filteredEscalas.map((escala) => {
+              const descObj = deserializeEscalaDescricao(escala.descricao);
+              const dataFormatada = escala.data ? formatDateBR(escala.data) : 'Data a definir';
+              const tituloCulto = descObj.titulo || 'Culto de Celebração';
+              const louvores = Array.isArray(descObj.louvores) ? descObj.louvores : [];
+              const itens = Array.isArray(escala.itens) ? escala.itens : [];
+
+              return (
+                <div
+                  key={escala.id}
+                  className="card"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                    padding: '16px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--panel-line)'
+                  }}
+                >
+                  {/* Cabeçalho do Card */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.74rem',
+                          background: 'var(--blue-bg)',
+                          color: 'var(--blue-glow)',
+                          border: '1px solid var(--blue-border)',
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-xs)',
+                          fontWeight: 600
+                        }}>
+                          📅 {dataFormatada}
+                        </span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--muted)' }}>
+                          #Culto-{escala.id}
+                        </span>
+                      </div>
+                      <h3 style={{
+                        fontFamily: 'var(--font-display)',
+                        fontSize: '1.05rem',
+                        fontWeight: 700,
+                        color: 'var(--text)',
+                        margin: 0
+                      }}>
+                        {tituloCulto}
+                      </h3>
+                    </div>
+
+                    {/* Botões de Ação */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingEscala(escala);
+                          setIsEscalaSheetOpen(true);
+                        }}
+                        className="action-btn edit"
+                        title="Editar culto e escala"
+                        aria-label="Editar culto"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRequestDelete('escala', escala.id, `o culto "${tituloCulto}" (${dataFormatada})`)}
+                        className="action-btn delete"
+                        title="Excluir escala"
+                        aria-label="Excluir escala"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Equipe Litúrgica */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gap: 8,
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--panel-elevated)',
+                    border: '1px solid var(--panel-line)'
+                  }}>
+                    {[
+                      { role: 'preletor', label: 'Preletor', badge: '🎙️', icon: Mic, color: '#38bdf8' },
+                      { role: 'dirigente', label: 'Dirigente', badge: '📖', icon: BookOpen, color: '#a78bfa' },
+                      { role: 'cantor', label: 'Cantor(a)', badge: '🎤', icon: Music, color: '#f472b6' },
+                      { role: 'musico', label: 'Músico', badge: '🎸', icon: Guitar, color: '#fb923c' }
+                    ].map((cfg) => {
+                      const matchedItem = itens.find((it) => {
+                        const f = (it.funcao || '').toLowerCase();
+                        return f.includes(cfg.role) || (cfg.role === 'musico' && f.includes('músico'));
+                      });
+                      const membro = matchedItem ? membrosMap[matchedItem.membro_id] : null;
+
+                      return (
+                        <div key={cfg.role} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: '0.68rem', color: cfg.color, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {cfg.badge} {cfg.label}
+                          </span>
+                          <span style={{
+                            fontSize: '0.82rem',
+                            fontWeight: membro ? 600 : 400,
+                            color: membro ? 'var(--text)' : 'var(--muted)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {membro ? membro.nome : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Louvores Escolhidos */}
+                  {louvores.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Music size={13} style={{ color: 'var(--blue-glow)' }} /> Louvores Selecionados ({louvores.length}):
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {louvores.map((louvor, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              fontSize: '0.74rem',
+                              padding: '4px 8px',
+                              borderRadius: 'var(--radius-xs)',
+                              background: 'var(--panel-hover)',
+                              border: '1px solid var(--panel-line)',
+                              color: 'var(--text)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4
+                            }}
+                          >
+                            <span style={{ color: 'var(--blue-glow)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{idx + 1}.</span>
+                            {louvor}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Observações */}
+                  {descObj.observacoes && (
+                    <p style={{
+                      fontSize: '0.76rem',
+                      fontStyle: 'italic',
+                      color: 'var(--muted)',
+                      margin: 0,
+                      paddingTop: 4,
+                      borderTop: '1px dashed var(--panel-line)'
+                    }}>
+                      "{descObj.observacoes}"
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+
+            {filteredEscalas.length === 0 && (
+              <div className="card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+                <Sparkles size={32} style={{ margin: '0 auto 10px', color: 'var(--blue-glow)', opacity: 0.6 }} />
+                <p style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Nenhum culto encontrado</p>
+                <p style={{ fontSize: '0.82rem' }}>Clique em "Novo Culto" para registrar uma nova escala com sorteio de louvores.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 6: CARGOS */}
+        {activeTab === 'cargos' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {filteredCargos.map((cargo) => {
+              const member = membrosMap[cargo.membro_id];
+              const memberName = member?.nome || `Membro #${cargo.membro_id}`;
+
+              const badgesList = [
+                { key: 'preletor', label: 'Preletor', badge: '🎙️', active: cargo.preletor, color: '#38bdf8' },
+                { key: 'dirigente', label: 'Dirigente', badge: '📖', active: cargo.dirigente, color: '#a78bfa' },
+                { key: 'cantor', label: 'Cantor', badge: '🎤', active: cargo.cantor, color: '#f472b6' },
+                { key: 'musico', label: 'Músico', badge: '🎸', active: cargo.musico, color: '#fb923c' },
+                { key: 'tesoureiro', label: 'Tesoureiro', badge: '💰', active: cargo.tesoureiro, color: '#34d399' }
+              ].filter((b) => b.active);
+
+              return (
+                <div
+                  key={cargo.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--panel-line)',
+                    gap: 12
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--muted)' }}>
+                        #{cargo.id} • Membro #{cargo.membro_id}
+                      </span>
+                    </div>
+                    <p style={{ fontWeight: 600, fontSize: '0.88rem', margin: 0, color: 'var(--text)' }}>
+                      {memberName}
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {badgesList.map((b) => (
+                        <span
+                          key={b.key}
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: 'var(--radius-xs)',
+                            background: 'var(--panel-hover)',
+                            border: `1px solid ${b.color}40`,
+                            color: b.color,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          {b.badge} {b.label}
+                        </span>
+                      ))}
+                      {badgesList.length === 0 && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontStyle: 'italic' }}>
+                          Nenhum cargo ativo
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCargo(cargo);
+                        setIsCargoSheetOpen(true);
+                      }}
+                      className="action-btn edit"
+                      title="Editar cargos do membro"
+                      aria-label="Editar cargos"
+                    >
+                      <Edit2 size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRequestDelete('cargo', cargo.id, `os cargos de "${memberName}"`)}
+                      className="action-btn delete"
+                      title="Excluir registro de cargos"
+                      aria-label="Excluir cargo"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredCargos.length === 0 && (
+              <div className="card" style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--muted)' }}>
+                Nenhum registro de cargo atribuído encontrado.
               </div>
             )}
           </div>
