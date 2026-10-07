@@ -13,7 +13,8 @@ export default function PeriodPicker({
   selectedMonth = 7,
   onChangeYear,
   onChangeMonth,
-  availableYears = [2026, 2025, 2024]
+  availableYears = [2026, 2025, 2024],
+  style = {}
 }) {
   const yearsList = Array.isArray(availableYears) && availableYears.length > 0
     ? availableYears
@@ -26,7 +27,7 @@ export default function PeriodPicker({
       justifyContent: 'space-between',
       flexWrap: 'wrap',
       gap: 10,
-      marginBottom: 16
+      ...style
     }}>
       {/* Selects de Mês e Ano */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 200 }}>
